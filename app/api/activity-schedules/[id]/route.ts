@@ -6,11 +6,11 @@ import mongoose from 'mongoose';
 // GET /api/activity-schedules/[id] - Get a specific activity schedule
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
-    const { id } = await params;
+    const { id } = await context.params;
     
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
@@ -46,11 +46,11 @@ export async function GET(
 // PUT /api/activity-schedules/[id] - Update an activity schedule
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
-    const { id } = await params;
+    const { id } = await context.params;
     
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
@@ -133,11 +133,11 @@ export async function PUT(
 // DELETE /api/activity-schedules/[id] - Delete an activity schedule
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
-    const { id } = await params;
+    const { id } = await context.params;
     
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
