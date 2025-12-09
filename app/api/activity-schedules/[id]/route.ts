@@ -8,9 +8,8 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
-
   try {
+    const { id } = await params;
     await dbConnect();
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -50,9 +49,8 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
-
   try {
+    const { id } = await params;
     await dbConnect();
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -152,9 +150,8 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
-
   try {
+    const { id } = await params;
     await dbConnect();
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
