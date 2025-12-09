@@ -3,10 +3,14 @@ import dbConnect from '@/utils/mongodb';
 import ActivityScheduleModel from '@/models/ActivitySchedule';
 import mongoose from 'mongoose';
 
+type RouteContext = {
+  params: Promise<{ id: string }>;
+};
+
 // GET /api/activity-schedules/[id] - Get a specific activity schedule
 export async function GET(
   request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  context: RouteContext
 ) {
   try {
     await dbConnect();
@@ -46,7 +50,7 @@ export async function GET(
 // PUT /api/activity-schedules/[id] - Update an activity schedule
 export async function PUT(
   request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  context: RouteContext
 ) {
   try {
     await dbConnect();
@@ -133,7 +137,7 @@ export async function PUT(
 // DELETE /api/activity-schedules/[id] - Delete an activity schedule
 export async function DELETE(
   request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  context: RouteContext
 ) {
   try {
     await dbConnect();
