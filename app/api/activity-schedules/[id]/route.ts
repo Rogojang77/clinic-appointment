@@ -6,9 +6,9 @@ import ActivityScheduleModel from "@/models/ActivitySchedule";
 // GET /api/activity-schedules/[id]
 export async function GET(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = params;
+  const { id } = await params;
 
   try {
     await dbConnect();
@@ -48,9 +48,9 @@ export async function GET(
 // PUT /api/activity-schedules/[id]
 export async function PUT(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = params;
+  const { id } = await params;
 
   try {
     await dbConnect();
@@ -150,9 +150,9 @@ export async function PUT(
 // DELETE /api/activity-schedules/[id]
 export async function DELETE(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = params;
+  const { id } = await params;
 
   try {
     await dbConnect();

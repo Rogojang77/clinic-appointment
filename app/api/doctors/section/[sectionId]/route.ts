@@ -7,12 +7,13 @@ import mongoose from 'mongoose';
 // GET /api/doctors/section/[sectionId] - Get all doctors for a specific section
 export async function GET(
   request: NextRequest,
-  { params }: { params: { sectionId: string } }
+  { params }: { params: Promise<{ sectionId: string }> }
 ) {
   try {
     await dbConnect();
+    const { sectionId } = await params;
     
-    if (!mongoose.Types.ObjectId.isValid(params.sectionId)) {
+    if (!mongoose.Types.ObjectId.isValid(sectionId)) {
       return NextResponse.json(
         { success: false, error: 'Invalid section ID' },
         { status: 400 }
@@ -20,7 +21,7 @@ export async function GET(
     }
     
     // Check if section exists
-    const section = await SectionModel.findById(params.sectionId);
+    const section = await SectionModel.findById(sectionId);
     if (!section) {
       return NextResponse.json(
         { success: false, error: 'Section not found' },
@@ -31,7 +32,7 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     const isActive = searchParams.get('isActive');
     
-    const filter: any = { sectionId: params.sectionId };
+    const filter: any = { sectionId: sectionId };
     if (isActive !== null) filter.isActive = isActive === 'true';
     
     const doctors = await DoctorModel.find(filter)

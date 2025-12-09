@@ -8,19 +8,20 @@ import mongoose from 'mongoose';
 // GET /api/sections/[id] - Get a specific section
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
+    const { id } = await params;
     
-    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
         { success: false, error: 'Invalid section ID' },
         { status: 400 }
       );
     }
     
-    const section = await SectionModel.findById(params.id);
+    const section = await SectionModel.findById(id);
     
     // Try to populate doctors, but don't fail if the collection doesn't exist
     if (section) {
@@ -55,12 +56,13 @@ export async function GET(
 // PUT /api/sections/[id] - Update a section
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
+    const { id } = await params;
     
-    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
         { success: false, error: 'Invalid section ID' },
         { status: 400 }
@@ -71,7 +73,7 @@ export async function PUT(
     const { name, description, isActive, locationIds, locationId, doctors } = body;
     
     // Check if section exists
-    const existingSection = await SectionModel.findById(params.id);
+    const existingSection = await SectionModel.findById(id);
     if (!existingSection) {
       return NextResponse.json(
         { success: false, error: 'Section not found' },
@@ -83,7 +85,7 @@ export async function PUT(
     if (name && name !== existingSection.name) {
       const nameConflict = await SectionModel.findOne({ 
         name, 
-        _id: { $ne: params.id } 
+        _id: { $ne: id } 
       });
       if (nameConflict) {
         return NextResponse.json(
@@ -124,7 +126,7 @@ export async function PUT(
     }
     
     const updatedSection = await SectionModel.findByIdAndUpdate(
-      params.id,
+      id,
       updateQuery,
       { new: true, runValidators: true }
     );
@@ -179,7 +181,7 @@ export async function PUT(
       try {
         // Remove this section from all doctors first
         await DoctorModel.updateMany(
-          { sectionId: params.id },
+          { sectionId: id },
           { $unset: { sectionId: 1 } }
         );
         
@@ -187,7 +189,7 @@ export async function PUT(
         if (doctors.length > 0) {
           await DoctorModel.updateMany(
             { _id: { $in: doctors } },
-            { $set: { sectionId: params.id } }
+            { $set: { sectionId: id } }
           );
         }
       } catch (doctorError) {
@@ -212,19 +214,20 @@ export async function PUT(
 // DELETE /api/sections/[id] - Delete a section
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
+    const { id } = await params;
     
-    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
         { success: false, error: 'Invalid section ID' },
         { status: 400 }
       );
     }
     
-    const section = await SectionModel.findById(params.id);
+    const section = await SectionModel.findById(id);
     
     if (!section) {
       return NextResponse.json(
@@ -236,7 +239,7 @@ export async function DELETE(
     // Remove section from all doctors before deleting
     try {
       await DoctorModel.updateMany(
-        { sectionId: params.id },
+        { sectionId: id },
         { $unset: { sectionId: 1 } }
       );
     } catch (doctorError) {
@@ -244,7 +247,7 @@ export async function DELETE(
       // Continue with section deletion
     }
     
-    await SectionModel.findByIdAndDelete(params.id);
+    await SectionModel.findByIdAndDelete(id);
     
     return NextResponse.json({
       success: true,

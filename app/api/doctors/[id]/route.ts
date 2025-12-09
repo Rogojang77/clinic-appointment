@@ -7,19 +7,20 @@ import mongoose from 'mongoose';
 // GET /api/doctors/[id] - Get a specific doctor
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
+    const { id } = await params;
     
-    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
         { success: false, error: 'Invalid doctor ID' },
         { status: 400 }
       );
     }
     
-    const doctor = await DoctorModel.findById(params.id);
+    const doctor = await DoctorModel.findById(id);
     
     if (!doctor) {
       return NextResponse.json(
@@ -52,12 +53,13 @@ export async function GET(
 // PUT /api/doctors/[id] - Update a doctor
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
+    const { id } = await params;
     
-    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
         { success: false, error: 'Invalid doctor ID' },
         { status: 400 }
@@ -76,7 +78,7 @@ export async function PUT(
     } = body;
     
     // Check if doctor exists
-    const existingDoctor = await DoctorModel.findById(params.id);
+    const existingDoctor = await DoctorModel.findById(id);
     if (!existingDoctor) {
       return NextResponse.json(
         { success: false, error: 'Doctor not found' },
@@ -89,7 +91,7 @@ export async function PUT(
       const nameConflict = await DoctorModel.findOne({ 
         name, 
         sectionId: sectionId || existingDoctor.sectionId,
-        _id: { $ne: params.id }
+        _id: { $ne: id }
       });
       if (nameConflict) {
         return NextResponse.json(
@@ -154,20 +156,20 @@ export async function PUT(
       // Remove doctor from old section
       await SectionModel.findByIdAndUpdate(
         existingDoctor.sectionId,
-        { $pull: { doctors: params.id } }
+        { $pull: { doctors: id } }
       );
       
       // Add doctor to new section
       await SectionModel.findByIdAndUpdate(
         sectionId,
-        { $addToSet: { doctors: params.id } }
+        { $addToSet: { doctors: id } }
       );
       
       updateData.sectionId = sectionId;
     }
     
     const updatedDoctor = await DoctorModel.findByIdAndUpdate(
-      params.id,
+      id,
       updateData,
       { new: true, runValidators: true }
     ).populate('sectionId', 'name description');
@@ -188,19 +190,20 @@ export async function PUT(
 // DELETE /api/doctors/[id] - Delete a doctor
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
+    const { id } = await params;
     
-    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
         { success: false, error: 'Invalid doctor ID' },
         { status: 400 }
       );
     }
     
-    const doctor = await DoctorModel.findById(params.id);
+    const doctor = await DoctorModel.findById(id);
     
     if (!doctor) {
       return NextResponse.json(
@@ -212,11 +215,11 @@ export async function DELETE(
     // Remove doctor from section's doctors array
     await SectionModel.findByIdAndUpdate(
       doctor.sectionId,
-      { $pull: { doctors: params.id } }
+      { $pull: { doctors: id } }
     );
     
     // Delete the doctor
-    await DoctorModel.findByIdAndDelete(params.id);
+    await DoctorModel.findByIdAndDelete(id);
     
     return NextResponse.json({
       success: true,

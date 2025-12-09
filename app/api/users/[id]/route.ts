@@ -8,19 +8,20 @@ import mongoose from 'mongoose';
 // GET /api/users/[id] - Get a specific user
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
+    const { id } = await params;
     
-    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
         { success: false, error: 'Invalid user ID' },
         { status: 400 }
       );
     }
     
-    const user = await UserModel.findById(params.id)
+    const user = await UserModel.findById(id)
       .select('-password -forgotpasswordToken -forgotpasswordToeknExpiry -verifyToken -verifyTokenExpiry');
     
     if (!user) {
@@ -75,12 +76,13 @@ export async function GET(
 // PUT /api/users/[id] - Update a user
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
+    const { id } = await params;
     
-    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
         { success: false, error: 'Invalid user ID' },
         { status: 400 }
@@ -99,7 +101,7 @@ export async function PUT(
     } = body;
     
     // Check if user exists
-    const existingUser = await UserModel.findById(params.id);
+    const existingUser = await UserModel.findById(id);
     if (!existingUser) {
       return NextResponse.json(
         { success: false, error: 'User not found' },
@@ -111,7 +113,7 @@ export async function PUT(
     if (email && email !== existingUser.email) {
       const emailConflict = await UserModel.findOne({ 
         email, 
-        _id: { $ne: params.id } 
+        _id: { $ne: id } 
       });
       if (emailConflict) {
         return NextResponse.json(
@@ -124,7 +126,7 @@ export async function PUT(
     if (username && username !== existingUser.username) {
       const usernameConflict = await UserModel.findOne({ 
         username, 
-        _id: { $ne: params.id } 
+        _id: { $ne: id } 
       });
       if (usernameConflict) {
         return NextResponse.json(
@@ -166,7 +168,7 @@ export async function PUT(
     }
     
     const updatedUser = await UserModel.findByIdAndUpdate(
-      params.id,
+      id,
       updateData,
       { new: true, runValidators: true }
     ).select('-password -forgotpasswordToken -forgotpasswordToeknExpiry -verifyToken -verifyTokenExpiry');
@@ -187,19 +189,20 @@ export async function PUT(
 // DELETE /api/users/[id] - Delete a user
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
+    const { id } = await params;
     
-    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
         { success: false, error: 'Invalid user ID' },
         { status: 400 }
       );
     }
     
-    const user = await UserModel.findById(params.id);
+    const user = await UserModel.findById(id);
     
     if (!user) {
       return NextResponse.json(
@@ -208,7 +211,7 @@ export async function DELETE(
       );
     }
     
-    await UserModel.findByIdAndDelete(params.id);
+    await UserModel.findByIdAndDelete(id);
     
     return NextResponse.json({
       success: true,

@@ -7,12 +7,13 @@ import mongoose from 'mongoose';
 // GET /api/activity-schedules/user/[userId] - Get all activity schedules for a specific user
 export async function GET(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
     await dbConnect();
+    const { userId } = await params;
     
-    if (!mongoose.Types.ObjectId.isValid(params.userId)) {
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
       return NextResponse.json(
         { success: false, error: 'Invalid user ID' },
         { status: 400 }
@@ -20,7 +21,7 @@ export async function GET(
     }
     
     // Check if user exists
-    const user = await UserModel.findById(params.userId);
+    const user = await UserModel.findById(userId);
     if (!user) {
       return NextResponse.json(
         { success: false, error: 'User not found' },
@@ -31,7 +32,7 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     const isActive = searchParams.get('isActive');
     
-    const filter: any = { userId: params.userId };
+    const filter: any = { userId: userId };
     if (isActive !== null) filter.isActive = isActive === 'true';
     
     const schedules = await ActivityScheduleModel.find(filter)

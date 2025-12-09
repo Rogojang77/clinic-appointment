@@ -5,19 +5,20 @@ import LocationModel from '@/models/Location';
 // GET /api/locations/[id] - Get a specific location
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
+    const { id } = await params;
     
-    if (!params.id || params.id === 'undefined') {
+    if (!id || id === 'undefined') {
       return NextResponse.json(
         { success: false, error: 'Invalid location ID' },
         { status: 400 }
       );
     }
     
-    const location = await LocationModel.findById(params.id);
+    const location = await LocationModel.findById(id);
     
     if (!location) {
       return NextResponse.json(
@@ -42,12 +43,13 @@ export async function GET(
 // PUT /api/locations/[id] - Update a specific location
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
+    const { id } = await params;
     
-    if (!params.id || params.id === 'undefined') {
+    if (!id || id === 'undefined') {
       return NextResponse.json(
         { success: false, error: 'Invalid location ID' },
         { status: 400 }
@@ -69,7 +71,7 @@ export async function PUT(
     if (isActive !== undefined) updateData.isActive = isActive;
     
     const updatedLocation = await LocationModel.findByIdAndUpdate(
-      params.id,
+      id,
       updateData,
       { new: true, runValidators: true }
     );
@@ -103,19 +105,20 @@ export async function PUT(
 // DELETE /api/locations/[id] - Delete a specific location
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
+    const { id } = await params;
     
-    if (!params.id || params.id === 'undefined') {
+    if (!id || id === 'undefined') {
       return NextResponse.json(
         { success: false, error: 'Invalid location ID' },
         { status: 400 }
       );
     }
     
-    const location = await LocationModel.findById(params.id);
+    const location = await LocationModel.findById(id);
     
     if (!location) {
       return NextResponse.json(
@@ -124,7 +127,7 @@ export async function DELETE(
       );
     }
     
-    await LocationModel.findByIdAndDelete(params.id);
+    await LocationModel.findByIdAndDelete(id);
     
     return NextResponse.json({
       success: true,
