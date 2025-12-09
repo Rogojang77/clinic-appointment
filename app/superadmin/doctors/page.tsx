@@ -26,7 +26,7 @@ export default function DoctorsPage() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const daysOfWeek = [
-    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
+    'Luni', 'Marți', 'Miercuri', 'Joi', 'Vineri', 'Sâmbătă', 'Duminică'
   ];
 
   useEffect(() => {
@@ -41,7 +41,7 @@ export default function DoctorsPage() {
       setDoctors(response.data.data);
     } catch (error) {
       console.error('Error fetching doctors:', error);
-      toast.error('Failed to load doctors');
+      toast.error('Nu s-au putut încărca medicii');
     } finally {
       setLoading(false);
     }
@@ -53,7 +53,7 @@ export default function DoctorsPage() {
       setSections(response.data.data);
     } catch (error) {
       console.error('Error fetching sections:', error);
-      toast.error('Failed to load sections');
+      toast.error('Nu s-au putut încărca secțiunile');
     }
   };
 
@@ -61,15 +61,15 @@ export default function DoctorsPage() {
     const errors: Record<string, string> = {};
 
     if (!formData.name.trim()) {
-      errors.name = 'Doctor name is required';
+      errors.name = 'Numele medicului este obligatoriu';
     }
 
     if (!formData.sectionId) {
-      errors.sectionId = 'Section is required';
+      errors.sectionId = 'Secțiunea este obligatorie';
     }
 
     if (formData.email && !/\S+@\S+\.\S+/.test(formData.email)) {
-      errors.email = 'Email is invalid';
+      errors.email = 'Email-ul este invalid';
     }
 
     setFormErrors(errors);
@@ -86,10 +86,10 @@ export default function DoctorsPage() {
     try {
       if (editingDoctor) {
         await doctorsApi.update(editingDoctor._id, formData);
-        toast.success('Doctor updated successfully');
+        toast.success('Medicul a fost actualizat cu succes');
       } else {
         await doctorsApi.create(formData);
-        toast.success('Doctor created successfully');
+        toast.success('Medicul a fost creat cu succes');
       }
 
       setModalOpen(false);
@@ -98,7 +98,7 @@ export default function DoctorsPage() {
       fetchDoctors();
     } catch (error: any) {
       console.error('Error saving doctor:', error);
-      toast.error(error.response?.data?.error || 'Failed to save doctor');
+      toast.error(error.response?.data?.error || 'Nu s-a putut salva medicul');
     }
   };
 
@@ -130,7 +130,7 @@ export default function DoctorsPage() {
       fetchDoctors();
     } catch (error: any) {
       console.error('Error deleting doctor:', error);
-      toast.error(error.response?.data?.error || 'Failed to delete doctor');
+      toast.error(error.response?.data?.error || 'Nu s-a putut șterge medicul');
     }
   };
 
@@ -279,9 +279,9 @@ export default function DoctorsPage() {
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Doctors</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Medici</h1>
             <p className="mt-1 text-sm text-gray-500">
-              Manage doctors and their schedules
+              Gestionează medicii și programările lor
             </p>
           </div>
           <button
@@ -289,7 +289,7 @@ export default function DoctorsPage() {
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
           >
             <Plus className="h-4 w-4 mr-2" />
-            Add Doctor
+            Adaugă Medic
           </button>
         </div>
 
@@ -300,37 +300,37 @@ export default function DoctorsPage() {
           onEdit={handleEdit}
           onDelete={handleDelete}
           loading={loading}
-          emptyMessage="No doctors found. Create your first doctor to get started."
+          emptyMessage="Nu s-au găsit medici. Creează primul medic pentru a începe."
         />
 
         {/* Modal */}
         <Modal
           isOpen={modalOpen}
           onClose={() => setModalOpen(false)}
-          title={editingDoctor ? 'Edit Doctor' : 'Add New Doctor'}
+          title={editingDoctor ? 'Editează Medic' : 'Adaugă Medic Nou'}
           size="xl"
         >
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <FormField
-                label="Doctor Name"
+                label="Nume Medic"
                 name="name"
                 type="text"
                 value={formData.name}
                 onChange={(value) => setFormData({ ...formData, name: value })}
                 error={formErrors.name}
                 required
-                placeholder="Enter doctor name"
+                placeholder="Introdu numele medicului"
               />
 
               <FormField
-                label="Specialization"
+                label="Specializare"
                 name="specialization"
                 type="text"
                 value={formData.specialization}
                 onChange={(value) => setFormData({ ...formData, specialization: value })}
                 error={formErrors.specialization}
-                placeholder="Enter specialization"
+                placeholder="Introdu specializarea"
               />
             </div>
 
@@ -342,22 +342,22 @@ export default function DoctorsPage() {
                 value={formData.email}
                 onChange={(value) => setFormData({ ...formData, email: value })}
                 error={formErrors.email}
-                placeholder="Enter email"
+                placeholder="Introdu email-ul"
               />
 
               <FormField
-                label="Phone"
+                label="Telefon"
                 name="phone"
                 type="text"
                 value={formData.phone}
                 onChange={(value) => setFormData({ ...formData, phone: value })}
                 error={formErrors.phone}
-                placeholder="Enter phone number"
+                placeholder="Introdu numărul de telefon"
               />
             </div>
 
             <FormField
-              label="Section"
+              label="Secțiune"
               name="sectionId"
               type="select"
               value={formData.sectionId}
@@ -368,7 +368,7 @@ export default function DoctorsPage() {
             />
 
             <FormField
-              label="Active"
+              label="Activ"
               name="isActive"
               type="checkbox"
               value={formData.isActive}
@@ -377,7 +377,7 @@ export default function DoctorsPage() {
 
             {/* Weekly Schedule */}
             <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Weekly Schedule</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Program Săptămânal</h3>
               <div className="space-y-4">
                 {daysOfWeek.map((day, dayIndex) => (
                   <div key={day} className="border rounded-lg p-4">
@@ -399,7 +399,7 @@ export default function DoctorsPage() {
                           onClick={() => addTimeSlot(dayIndex)}
                           className="text-sm text-blue-600 hover:text-blue-800"
                         >
-                          + Add Time Slot
+                          + Adaugă Interval Orar
                         </button>
                       )}
                     </div>
@@ -414,7 +414,7 @@ export default function DoctorsPage() {
                               onChange={(e) => updateTimeSlot(dayIndex, slotIndex, 'startTime', e.target.value)}
                               className="block w-32 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
                             />
-                            <span className="text-gray-500">to</span>
+                            <span className="text-gray-500">până la</span>
                             <input
                               type="time"
                               value={slot.endTime}
@@ -427,13 +427,13 @@ export default function DoctorsPage() {
                               onChange={(e) => updateTimeSlot(dayIndex, slotIndex, 'isAvailable', e.target.checked)}
                               className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                             />
-                            <label className="text-sm text-gray-700">Available</label>
+                            <label className="text-sm text-gray-700">Disponibil</label>
                             <button
                               type="button"
                               onClick={() => removeTimeSlot(dayIndex, slotIndex)}
                               className="text-red-600 hover:text-red-800 text-sm"
                             >
-                              Remove
+                              Elimină
                             </button>
                           </div>
                         ))}
@@ -450,13 +450,13 @@ export default function DoctorsPage() {
                 onClick={() => setModalOpen(false)}
                 className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
-                Cancel
+                Anulează
               </button>
               <button
                 type="submit"
                 className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
-                {editingDoctor ? 'Update' : 'Create'}
+                {editingDoctor ? 'Actualizează' : 'Creează'}
               </button>
             </div>
           </form>

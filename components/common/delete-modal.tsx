@@ -20,7 +20,7 @@ const DeleteModal = ({
   // endpoint,
   open,
   setOpen,
-  msg = "Delete Successfully !",
+  msg = "Șters cu succes!",
   dataRefetch,
   // id,
 }: {
@@ -43,7 +43,7 @@ const DeleteModal = ({
       await dataRefetch();
       setOpen(false);
     } catch (err) {
-      toast.error("Something went wrong");
+      toast.error("Ceva nu a mers bine");
     }
   };
 
@@ -52,7 +52,7 @@ const DeleteModal = ({
       <DialogContent className="p-0 rounded-2xl overflow-hidden">
         <DialogHeader className="m-0">
           <DialogTitle className="flex justify-between items-center font-semibold text-[22px] px-4 py-3">
-            Do You Want to Delete?
+            Vrei să ștergi?
             <Button
               onClick={() => setOpen(false)}
               className="w-11 h-10 px-0 bg-white hover:bg-gray-100 text-black"
@@ -66,10 +66,10 @@ const DeleteModal = ({
               <Trash className="w-[64px] h-[64px]"/>
               <div className="space-y-2">
                 <h3 className="font-medium text-[20px] text-black">
-                  Delete ?{" "}
+                  Șterge?{" "}
                 </h3>
                 <p className="text-[18px] text-gray-500 ">
-                  Are you sure you want to permanently delete ?
+                  Ești sigur că vrei să ștergi permanent?
                 </p>
               </div>
             </div>
@@ -81,7 +81,7 @@ const DeleteModal = ({
             onClick={() => setOpen(false)}
             className="w-fit h-11 px-10 text-[20px] border rounded-lg"
           >
-            Cancel
+            Anulează
           </DialogClose>
           <Button
             className="w-full h-11 bg-rose-100 hover:bg-rose-100 border border-rose-500 text-black text-[20px] flex justify-center items-center space-x-4"
@@ -92,7 +92,7 @@ const DeleteModal = ({
             ) : (
               <Trash2 className="w-6 h-6 text-rose-500" />
             )}{" "}
-            <h3 className="">Delete Permanently</h3>
+            <h3 className="">Șterge Permanent</h3>
           </Button>
         </DialogFooter>
       </DialogContent>

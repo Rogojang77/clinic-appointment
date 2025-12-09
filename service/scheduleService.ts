@@ -3,9 +3,13 @@ import axios from "axios";
 // Utility function to fetch time slots by location, day, and optional date
 export async function getTimeSlotsByLocationAndDay(filters:any) {
   try {
+    // Get token from localStorage and add to headers
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    
     const response = await axios.get("/api/schedule", {
-      params: filters, 
-      withCredentials: true,
+      params: filters,
+      headers,
     });
 
     if (response.data) {
@@ -22,7 +26,6 @@ export async function getTimeSlotsByLocationAndDay(filters:any) {
 // High-level function to handle API calls
 export const fetchTimeSlotsAPI = async (location:string, dayName:string, date?:string) => {
   if (!location || !dayName) {
-    console.warn("Location or dayName is missing.");
     return [];
   }
   

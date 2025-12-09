@@ -9,8 +9,6 @@ export async function POST(request: NextRequest) {
   try {
     await dbConnect();
 
-    console.log('Starting location update...');
-
     // Find existing locations
     const beiusLocation = await LocationModel.findOne({ name: 'Beiuș' });
     const oradeaLocation = await LocationModel.findOne({ name: 'Oradea' });
@@ -22,12 +20,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('Beiuș location ID:', beiusLocation._id);
-    console.log('Oradea location ID:', oradeaLocation._id);
-
     // Get all sections
     const sections = await SectionModel.find({});
-    console.log(`Found ${sections.length} sections to update`);
 
     let beiusCount = 0;
     let oradeaCount = 0;
@@ -41,16 +35,13 @@ export async function POST(request: NextRequest) {
       
       if (section.name === 'Ecografie') {
         oradeaCount++;
-        console.log(`Updated section "${section.name}" to location: Oradea`);
       } else {
         beiusCount++;
-        console.log(`Updated section "${section.name}" to location: Beiuș`);
       }
     }
 
     // Get all doctors
     const doctors = await DoctorModel.find({});
-    console.log(`Found ${doctors.length} doctors to update`);
 
     let beiusDoctorCount = 0;
     let oradeaDoctorCount = 0;
@@ -65,15 +56,11 @@ export async function POST(request: NextRequest) {
         
         if (section.name === 'Ecografie') {
           oradeaDoctorCount++;
-          console.log(`Updated doctor "${doctor.name}" to location: Oradea`);
         } else {
           beiusDoctorCount++;
-          console.log(`Updated doctor "${doctor.name}" to location: Beiuș`);
         }
       }
     }
-
-    console.log('Location update completed successfully!');
 
     return NextResponse.json({
       success: true,

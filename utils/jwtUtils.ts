@@ -2,27 +2,104 @@ import { SignJWT, jwtVerify } from 'jose';
 
 const secret = new TextEncoder().encode(process.env.SECRET!);
 
-export async function verifyJWT(token: string) {
+// TypeScript interface for JWT payload
+export interface JWTPayload {
+  id: string;
+  email: string;
+  username: string;
+  role: string;
+  isAdmin: boolean;
+  iat?: number;
+  exp?: number;
+}
+
+/**
+ * Verifies a JWT token and returns the decoded payload
+ * @param token - The JWT token to verify
+ * @returns The decoded payload or null if verification fails
+ */
+export async function verifyJWT(token: string): Promise<JWTPayload | null> {
   try {
+    if (!token || typeof token !== 'string') {
+      return null;
+    }
+
     // Verify the token using jose (Edge Runtime compatible)
     const { payload } = await jwtVerify(token, secret);
-    return payload; // The decoded payload
+    
+    // Type guard to ensure payload has required fields
+    if (
+      payload &&
+      typeof payload === 'object' &&
+      'id' in payload &&
+      'email' in payload &&
+      'username' in payload &&
+      'role' in payload
+    ) {
+      return payload as JWTPayload;
+    }
+    
+    return null;
   } catch (error) {
-    console.error("JWT verification failed:", error);
-    return null; 
+    // Silently fail for expired/invalid tokens (don't log sensitive errors)
+    if (error instanceof Error && error.name === 'JWTExpired') {
+      return null;
+    }
+    return null;
   }
 }
 
-export async function createJWT(payload: any) {
+/**
+ * Creates a JWT token with the provided payload
+ * @param payload - The payload to encode in the token
+ * @returns The JWT token string or null if creation fails
+ */
+export async function createJWT(payload: Omit<JWTPayload, 'iat' | 'exp'>): Promise<string | null> {
   try {
-    const token = await new SignJWT(payload)
+    if (!payload || !payload.id || !payload.email) {
+      throw new Error('Invalid payload: missing required fields');
+    }
+
+    const token = await new SignJWT(payload as Record<string, any>)
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
       .setExpirationTime('7d')
       .sign(secret);
+    
     return token;
   } catch (error) {
     console.error("JWT creation failed:", error);
     return null;
+  }
+}
+
+/**
+ * Checks if a token is expired without full verification
+ * Useful for client-side checks
+ * @param token - The JWT token to check
+ * @returns True if token is expired or invalid, false otherwise
+ */
+export function isTokenExpiredSync(token: string): boolean {
+  try {
+    if (!token || typeof token !== 'string') {
+      return true;
+    }
+
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      return true;
+    }
+
+    const payload = JSON.parse(atob(parts[1]));
+    const expirationDate = payload.exp;
+
+    if (!expirationDate || typeof expirationDate !== 'number') {
+      return true;
+    }
+
+    // Check if token is expired (with 5 second buffer for clock skew)
+    return expirationDate * 1000 < Date.now() - 5000;
+  } catch (error) {
+    return true;
   }
 }

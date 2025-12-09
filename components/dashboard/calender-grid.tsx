@@ -3,6 +3,7 @@ import dayjs from "dayjs";
 import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
 import { getCalendarDays } from "@/utils/getCalenderDays";
 import axios from "axios";
+import Spinner from "../common/loader";
 
 dayjs.extend(isSameOrBefore);
 
@@ -23,17 +24,24 @@ const CalendarGrid = ({
   setDayName: any;
   locations?: any[];
 }) => {
-  const [currentDate, setCurrentDate] = useState(dayjs());
+  const [currentDate, setCurrentDate] = useState<dayjs.Dayjs | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [colorMap, setColorMap] = useState<{ [key: string]: string }>({});
 
-  const startDate = currentDate.startOf("month").format("YYYY-MM-DD");
-  const endDate = currentDate.endOf("month").format("YYYY-MM-DD");
+  // Initialize currentDate on client side only to avoid hydration mismatch
+  useEffect(() => {
+    if (currentDate === null) {
+      setCurrentDate(dayjs());
+    }
+  }, [currentDate]);
 
-  const calendarDays = getCalendarDays(currentDate);
+  const startDate = currentDate?.startOf("month").format("YYYY-MM-DD") || "";
+  const endDate = currentDate?.endOf("month").format("YYYY-MM-DD") || "";
+
+  const calendarDays = currentDate ? getCalendarDays(currentDate) : [];
 
   const handleMonthChange = (direction: number) => {
-    setCurrentDate((prev) => prev.add(direction, "month"));
+    setCurrentDate((prev) => prev ? prev.add(direction, "month") : dayjs());
   };
 
   const formatDate = (date: any) => date.format("DD/MM/YY");
@@ -43,12 +51,18 @@ const CalendarGrid = ({
     setDayName(date.format("dddd"));
   };
   useEffect(() => {
+    // Don't fetch if currentDate is not initialized yet
+    if (!currentDate || !startDate || !endDate) return;
+    
     const fetchColors = async () => {
       setIsLoading(true);
       try {
+        const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        
         const response = await axios.get("/api/colors", {
           params: { startDate, endDate, location },
-          withCredentials: true,
+          headers,
         });
 
         const data = Array.isArray(response.data?.data)
@@ -78,7 +92,7 @@ const CalendarGrid = ({
     };
 
     fetchColors();
-  }, [startDate, endDate, location]);
+  }, [startDate, endDate, location, currentDate]);
 
   return (
     <div className="flex flex-col lg:flex-row p-4 lg:space-x-10 w-full justify-between lg:px-10 px-5">
@@ -100,50 +114,62 @@ const CalendarGrid = ({
         </div>
       </div>
 
-      <div className="flex w-full mt-5 lg:mt-0">
-        <div className="mt-[85px] space-y-[10px] min-w-16">
-          {["Săpt 1", "Săpt 2", "Săpt 3", "Săpt 4", "Săpt 5"].map(
-            (week, index) => (
-              <div
-                key={index + week}
-                className="font-bold lg:text-[15px] text-[12px]"
-              >
-                {week}
-              </div>
-            )
-          )}
+      {!currentDate ? (
+        <div className="flex w-full mt-5 lg:mt-0 justify-center items-center">
+          <div className="text-gray-500">Se încarcă...</div>
         </div>
-        <div className="flex flex-col w-full">
-          <div className="flex items-center justify-between mb-4">
-            <button
-              onClick={() => handleMonthChange(-1)}
-              className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded lg:text-[15px] text-[12px]"
-            >
-              ← Previous
-            </button>
-            <div className="text-lg font-bold">
-              {currentDate.format("MMMM YYYY")}
+      ) : (
+        <>
+          <div className="flex w-full mt-5 lg:mt-0">
+            <div className="mt-[85px] space-y-[10px] min-w-16">
+              {["Săpt 1", "Săpt 2", "Săpt 3", "Săpt 4", "Săpt 5"].map(
+                (week, index) => (
+                  <div
+                    key={index + week}
+                    className="font-bold lg:text-[15px] text-[12px]"
+                  >
+                    {week}
+                  </div>
+                )
+              )}
             </div>
-            <button
-              onClick={() => handleMonthChange(1)}
-              className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded lg:text-[15px] text-[12px]"
-            >
-              Next →
-            </button>
-          </div>
-
-          <div className="grid grid-cols-6 gap-2 text-center lg:text-[15px] text-[12px]">
-            {["Luni", "Marți", "Miercuri", "Joi", "Vineri", "Sâmbătă"].map(
-              (day, index) => (
-                <div key={index} className="font-bold">
-                  {day}
+            <div className="flex flex-col w-full relative">
+              <div className="flex items-center justify-between mb-4">
+                <button
+                  onClick={() => handleMonthChange(-1)}
+                  className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded lg:text-[15px] text-[12px]"
+                >
+                  ← Anterior
+                </button>
+                <div className="text-lg font-bold">
+                  {currentDate.format("MMMM YYYY")}
                 </div>
-              )
-            )}
+                <button
+                  onClick={() => handleMonthChange(1)}
+                  className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded lg:text-[15px] text-[12px]"
+                >
+                  Următor →
+                </button>
+              </div>
 
-            {calendarDays.map((date: any, index: number) => {
+              {isLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 z-10 rounded-md">
+                  <Spinner />
+                </div>
+              )}
+              <div className="grid grid-cols-6 gap-2 text-center lg:text-[15px] text-[12px]">
+                {["Luni", "Marți", "Miercuri", "Joi", "Vineri", "Sâmbătă"].map(
+                  (day, index) => (
+                    <div key={index} className="font-bold">
+                      {day}
+                    </div>
+                  )
+                )}
+
+                {calendarDays.map((date: any, index: number) => {
               const formattedDate = date.format("YYYY-MM-DD"); // Ensure date format matches API
-              const isBeforeToday = date.isBefore(dayjs(), "day");
+              const today = dayjs();
+              const isBeforeToday = date.isBefore(today, "day");
               const isSelected =
                 selectedDate && date.isSame(selectedDate, "day");
 
@@ -174,9 +200,11 @@ const CalendarGrid = ({
                 </div>
               );
             })}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        </>
+      )}
     </div>
   );
 };

@@ -4,6 +4,7 @@ import SectionModel from '@/models/Section';
 import DoctorModel from '@/models/Doctor';
 import LocationModel from '@/models/Location';
 import { Section } from '@/types';
+import { requireAuth } from '@/utils/authHelpers';
 
 // Ensure Doctor model is registered
 import '@/models/Doctor';
@@ -11,6 +12,12 @@ import '@/models/Doctor';
 // GET /api/sections - Get all sections
 export async function GET(request: NextRequest) {
   try {
+    // Authenticate request
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response if auth failed
+    }
+
     await dbConnect();
 
     const { searchParams } = new URL(request.url);
@@ -46,7 +53,7 @@ export async function GET(request: NextRequest) {
             sectionObj.locations = populatedLocations.map(loc => loc.toObject());
             sectionObj.locationIds = sectionObj.locationIds; // Keep the original IDs
           } catch (locationError) {
-            console.warn('Could not populate locations for section:', locationError);
+            // Silently skip if locations cannot be populated
           }
         }
         
@@ -60,7 +67,7 @@ export async function GET(request: NextRequest) {
               sectionObj.locationId = sectionObj.locationId; // Keep the original ID
             }
           } catch (locationError) {
-            console.warn('Could not populate location for section:', locationError);
+            // Silently skip if location cannot be populated
           }
         }
         
@@ -88,11 +95,7 @@ export async function GET(request: NextRequest) {
         success: true,
         data: populatedSections
       });
-    } catch (populateError) {
-      console.error('Could not populate doctors manually:', populateError);
-      if (populateError && typeof populateError === 'object' && 'message' in populateError) {
-        console.error('Populate error details:', populateError.message);
-      }
+      } catch (populateError) {
       // Continue without populated doctors
     }
     
@@ -112,6 +115,12 @@ export async function GET(request: NextRequest) {
 // POST /api/sections - Create a new section
 export async function POST(request: NextRequest) {
   try {
+    // Authenticate request
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response if auth failed
+    }
+
     await dbConnect();
     
     const body = await request.json();
@@ -171,7 +180,6 @@ export async function POST(request: NextRequest) {
           { $set: { sectionId: section._id } }
         );
       } catch (doctorError) {
-        console.warn('Could not assign doctors to section:', doctorError);
         // Continue without failing the section creation
       }
     }
@@ -187,7 +195,7 @@ export async function POST(request: NextRequest) {
         }).select('name isActive');
         sectionObj.locations = populatedLocations.map(loc => loc.toObject());
       } catch (locationError) {
-        console.warn('Could not populate locations for section:', locationError);
+        // Silently skip if locations cannot be populated
       }
     }
     
@@ -205,7 +213,7 @@ export async function POST(request: NextRequest) {
           isActive: doctor.isActive
         }));
       } catch (doctorError) {
-        console.warn('Could not populate doctors for section:', doctorError);
+        // Silently skip if doctors cannot be populated
       }
     }
     

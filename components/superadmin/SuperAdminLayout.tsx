@@ -47,8 +47,10 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
       const response = await fetch('/api/logout');
       const data = await response.json();
       
-      // Clear cookies
-      document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+      // Clear token from localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('auth_token');
+      }
       
       clearUser();
       toast.success(data.message || 'Logged out successfully');

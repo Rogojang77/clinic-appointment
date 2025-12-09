@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import AppointmentModel from "@/models/Appointment";
 import SectionModel from "@/models/Section";
 import DoctorModel from "@/models/Doctor";
-import { verifyJWT } from "@/utils/jwtUtils";
+import { requireAuth } from "@/utils/authHelpers";
 import countDefaultTimeSlots from "../utils/getDefaultTimeSlotCount";
 import countAppointments from "../utils/countAppointments";
 import ColorsModel from "@/models/Colors";
@@ -19,23 +19,12 @@ export async function GET(request: NextRequest) {
     const doctorName = searchParams.get("doctorName");
   
     try {
-      // Validate JWT token
-      const token = request.cookies.get("token")?.value;
-      if (!token) {
-        return NextResponse.json(
-          { message: "Authentication required!" },
-          { status: 401 }
-        );
+      // Authenticate request
+      const authResult = await requireAuth(request);
+      if (authResult instanceof NextResponse) {
+        return authResult; // Return error response if auth failed
       }
-  
-      // Decode and verify JWT token
-      const decoded = await verifyJWT(token);
-      if (!decoded) {
-        return NextResponse.json(
-          { message: "Invalid or expired token!" },
-          { status: 401 }
-        );
-      }
+      const { payload: decoded } = authResult;
   
       // Build filter criteria
       const filter: any = {};
@@ -65,7 +54,7 @@ export async function GET(request: NextRequest) {
                 appointmentObj.section = section.toObject();
               }
             } catch (sectionError) {
-              console.warn('Could not populate section for appointment:', sectionError);
+              // Silently skip if section cannot be populated
             }
           }
           
@@ -78,7 +67,7 @@ export async function GET(request: NextRequest) {
                 appointmentObj.doctor = doctor.toObject();
               }
             } catch (doctorError) {
-              console.warn('Could not populate doctor for appointment:', doctorError);
+              // Silently skip if doctor cannot be populated
             }
           }
           
@@ -88,8 +77,8 @@ export async function GET(request: NextRequest) {
       
       return NextResponse.json({ success: true, data: populatedAppointments }, { status: 200 });
     } catch (err) {
-      console.log(err);
-      return NextResponse.json({ message: "Server Error", err }, { status: 500 });
+      console.error("Error fetching appointments:", err);
+      return NextResponse.json({ message: "Server Error" }, { status: 500 });
     }
 }
 
@@ -111,23 +100,12 @@ export async function POST(request: NextRequest) {
   } = await request.json();
 
   try {
-    // Validate JWT token
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return NextResponse.json(
-        { message: "Authentication required!" },
-        { status: 401 }
-      );
+    // Authenticate request
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response if auth failed
     }
-
-    // Decode and verify JWT token
-    const decoded = await verifyJWT(token);
-    if (!decoded) {
-      return NextResponse.json(
-        { message: "Invalid or expired token!" },
-        { status: 401 }
-      );
-    }
+    const { payload: decoded } = authResult;
 
     // Get the count of default time slots
     const defaultSlotCount = await countDefaultTimeSlots(location, day);
@@ -195,23 +173,12 @@ export async function PATCH(request: NextRequest) {
     // Parse the request body for updated data
     const updatedData = await request.json();
 
-    // Validate JWT token
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return NextResponse.json(
-        { message: "Authentication required!" },
-        { status: 401 }
-      );
+    // Authenticate request
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response if auth failed
     }
-
-    // Decode and verify JWT token
-    const decoded = await verifyJWT(token);
-    if (!decoded) {
-      return NextResponse.json(
-        { message: "Invalid or expired token!" },
-        { status: 401 }
-      );
-    }
+    const { payload: decoded } = authResult;
 
     // Partially update the appointment by ID
     const updatedAppointment = await AppointmentModel.findByIdAndUpdate(
@@ -250,23 +217,12 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Validate JWT token
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return NextResponse.json(
-        { message: "Authentication required!" },
-        { status: 401 }
-      );
+    // Authenticate request
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response if auth failed
     }
-
-    // Decode and verify JWT token
-    const decoded = await verifyJWT(token);
-    if (!decoded) {
-      return NextResponse.json(
-        { message: "Invalid or expired token!" },
-        { status: 401 }
-      );
-    }
+    const { payload: decoded } = authResult;
 
     // Delete the appointment by ID
     const deletedAppointment = await AppointmentModel.findByIdAndDelete(id);

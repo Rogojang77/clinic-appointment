@@ -60,7 +60,7 @@ export default function SectionsPage() {
       }
     } catch (error) {
       console.error("Error fetching sections:", error);
-      toast.error("Failed to load sections");
+      toast.error("Nu s-au putut încărca secțiunile");
       setShowDepartments(true);
     } finally {
       setLoading(false);
@@ -82,7 +82,7 @@ export default function SectionsPage() {
       setLocations(response.data.data);
     } catch (error) {
       console.error("Error fetching locations:", error);
-      toast.error("Failed to load locations");
+      toast.error("Nu s-au putut încărca locațiile");
     }
   };
 
@@ -90,11 +90,11 @@ export default function SectionsPage() {
     const errors: Record<string, string> = {};
 
     if (!formData.name.trim()) {
-      errors.name = "Section name is required";
+      errors.name = "Numele secțiunii este obligatoriu";
     }
 
     if (!formData.locationIds || formData.locationIds.length === 0) {
-      errors.locationIds = "At least one location is required";
+      errors.locationIds = "Cel puțin o locație este obligatorie";
     }
 
     setFormErrors(errors);
@@ -111,10 +111,10 @@ export default function SectionsPage() {
     try {
       if (editingSection) {
         await sectionsApi.update(editingSection._id, formData);
-        toast.success("Section updated successfully");
+        toast.success("Secțiunea a fost actualizată cu succes");
       } else {
         await sectionsApi.create(formData);
-        toast.success("Section created successfully");
+        toast.success("Secțiunea a fost creată cu succes");
       }
 
       setModalOpen(false);
@@ -123,7 +123,7 @@ export default function SectionsPage() {
       fetchSections();
     } catch (error: any) {
       console.error("Error saving section:", error);
-      toast.error(error.response?.data?.error || "Failed to save section");
+      toast.error(error.response?.data?.error || "Nu s-a putut salva secțiunea");
     }
   };
 
@@ -158,7 +158,7 @@ export default function SectionsPage() {
   const handleDelete = async (section: Section) => {
     if (
       !confirm(
-        `Are you sure you want to delete section "${section.name}"? This will also remove all associated doctors.`
+        `Ești sigur că vrei să ștergi secțiunea "${section.name}"? Aceasta va elimina și toți medicii asociați.`
       )
     ) {
       return;
@@ -166,11 +166,11 @@ export default function SectionsPage() {
 
     try {
       await sectionsApi.delete(section._id);
-      toast.success("Section deleted successfully");
+      toast.success("Secțiunea a fost ștearsă cu succes");
       fetchSections();
     } catch (error: any) {
       console.error("Error deleting section:", error);
-      toast.error(error.response?.data?.error || "Failed to delete section");
+      toast.error(error.response?.data?.error || "Nu s-a putut șterge secțiunea");
     }
   };
 
@@ -197,7 +197,7 @@ export default function SectionsPage() {
       const defaultLocation =
         locations.find((loc: any) => loc.isActive) || locations[0];
       if (!defaultLocation) {
-        toast.error("No locations available. Please create a location first.");
+        toast.error("Nu sunt locații disponibile. Vă rugăm să creați mai întâi o locație.");
         return;
       }
 
@@ -210,13 +210,13 @@ export default function SectionsPage() {
           locationIds: [defaultLocation._id],
         });
       }
-      toast.success("Sections created from departments successfully");
+      toast.success("Secțiunile au fost create din departamente cu succes");
       fetchSections();
     } catch (error: any) {
       console.error("Error creating sections from departments:", error);
       toast.error(
         error.response?.data?.error ||
-          "Failed to create sections from departments"
+          "Nu s-au putut crea secțiunile din departamente"
       );
     }
   };
@@ -365,16 +365,6 @@ export default function SectionsPage() {
     },
   ];
 
-  // Debug logging
-  console.log(
-    "Render state - showDepartments:",
-    showDepartments,
-    "sections.length:",
-    sections.length,
-    "loading:",
-    loading
-  );
-
   // If showing departments (when sections don't exist)
   if (showDepartments) {
     const departmentColumns = [
@@ -489,9 +479,9 @@ export default function SectionsPage() {
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Sections</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Secțiuni</h1>
             <p className="mt-1 text-sm text-gray-500">
-              Manage medical sections and their doctors
+              Gestionează secțiunile medicale și medicii lor
             </p>
           </div>
           <button
@@ -499,7 +489,7 @@ export default function SectionsPage() {
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
           >
             <Plus className="h-4 w-4 mr-2" />
-            Add Section
+            Adaugă Secțiune
           </button>
         </div>
 
@@ -510,29 +500,29 @@ export default function SectionsPage() {
           onEdit={handleEdit}
           onDelete={handleDelete}
           loading={loading}
-          emptyMessage="No sections found."
+          emptyMessage="Nu s-au găsit secțiuni."
         />
 
         {/* Modal */}
         <Modal
           isOpen={modalOpen}
           onClose={() => setModalOpen(false)}
-          title={editingSection ? "Edit Section" : "Add New Section"}
+          title={editingSection ? "Editează Secțiune" : "Adaugă Secțiune Nouă"}
         >
           <form onSubmit={handleSubmit} className="space-y-4">
             <FormField
-              label="Section Name"
+              label="Nume Secțiune"
               name="name"
               type="text"
               value={formData.name}
               onChange={(value) => setFormData({ ...formData, name: value })}
               error={formErrors.name}
               required
-              placeholder="Enter section name"
+              placeholder="Introdu numele secțiunii"
             />
 
             <FormField
-              label="Description"
+              label="Descriere"
               name="description"
               type="textarea"
               value={formData.description}
@@ -540,17 +530,17 @@ export default function SectionsPage() {
                 setFormData({ ...formData, description: value })
               }
               error={formErrors.description}
-              placeholder="Enter section description"
+              placeholder="Introdu descrierea secțiunii"
             />
 
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">
-                Locations <span className="text-red-500">*</span>
+                Locații <span className="text-red-500">*</span>
               </label>
               <div className="max-h-48 overflow-y-auto border rounded-md p-3 space-y-2">
                 {locations.length === 0 ? (
                   <p className="text-sm text-gray-500 text-center py-4">
-                    No locations available
+                    Nu sunt locații disponibile
                   </p>
                 ) : (
                   locations.map((location) => (
@@ -584,7 +574,7 @@ export default function SectionsPage() {
                         </span>
                         {!location.isActive && (
                           <span className="ml-2 text-xs text-gray-500">
-                            (Inactive)
+                            (Inactiv)
                           </span>
                         )}
                       </label>
@@ -594,8 +584,7 @@ export default function SectionsPage() {
               </div>
               {formData.locationIds.length > 0 && (
                 <p className="mt-2 text-sm text-gray-600">
-                  {formData.locationIds.length} location
-                  {formData.locationIds.length !== 1 ? "s" : ""} selected
+                  {formData.locationIds.length} {formData.locationIds.length === 1 ? "locație selectată" : "locații selectate"}
                 </p>
               )}
               {formErrors.locationIds && (
@@ -604,7 +593,7 @@ export default function SectionsPage() {
             </div>
 
             <FormField
-              label="Active"
+              label="Activ"
               name="isActive"
               type="checkbox"
               value={formData.isActive}
@@ -616,14 +605,14 @@ export default function SectionsPage() {
             {/* Doctors Assignment */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Assign Doctors
+                Atribuie Medici
               </label>
               <div className="max-h-48 overflow-y-auto border rounded-md p-3 space-y-2">
                 {getAvailableDoctors().length === 0 ? (
                   <p className="text-sm text-gray-500 text-center py-4">
                     {editingSection
-                      ? "No available doctors to assign"
-                      : "No unassigned doctors available"}
+                      ? "Nu sunt medici disponibili de atribuit"
+                      : "Nu sunt medici neatribuiți disponibili"}
                   </p>
                 ) : (
                   getAvailableDoctors().map((doctor) => (
@@ -647,7 +636,7 @@ export default function SectionsPage() {
                             {doctor.name}
                           </span>
                           <span className="text-xs text-gray-500">
-                            {doctor.specialization || "No specialization"}
+                            {doctor.specialization || "Fără specializare"}
                           </span>
                         </div>
                         {doctor.email && (
@@ -662,8 +651,7 @@ export default function SectionsPage() {
               </div>
               {formData.doctors.length > 0 && (
                 <p className="mt-2 text-sm text-gray-600">
-                  {formData.doctors.length} doctor
-                  {formData.doctors.length !== 1 ? "s" : ""} selected
+                  {formData.doctors.length} {formData.doctors.length === 1 ? "medic selectat" : "medici selectați"}
                 </p>
               )}
             </div>
@@ -674,13 +662,13 @@ export default function SectionsPage() {
                 onClick={() => setModalOpen(false)}
                 className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
-                Cancel
+                Anulează
               </button>
               <button
                 type="submit"
                 className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
-                {editingSection ? "Update" : "Create"}
+                {editingSection ? "Actualizează" : "Creează"}
               </button>
             </div>
           </form>

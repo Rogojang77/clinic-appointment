@@ -6,7 +6,7 @@ import axios from "axios";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { useUserStore } from "@/store/store";
-import Cookies from "js-cookie";
+import { removeToken } from "@/utils/tokenStorage";
 
 export default function Navbar() {
   const router = useRouter();
@@ -14,14 +14,19 @@ export default function Navbar() {
   const { clearUser } = useUserStore();
 
   const handleLogout = async () => {
-    const res = await axios.get("/api/logout");
-    Cookies.remove("token");
-    clearUser();
-    toast.success(res.data.message);
-    router.push("/");
+    try {
+      const res = await axios.get("/api/logout");
+      removeToken(); // Remove token from localStorage
+      clearUser();
+      toast.success(res.data.message);
+      router.push("/");
+    } catch (error) {
+      // Even if API call fails, clear local state
+      removeToken();
+      clearUser();
+      router.push("/");
+    }
   };
-
-  console.log(user);
 
   return (
     <nav className="bg-white p-4 w-full">

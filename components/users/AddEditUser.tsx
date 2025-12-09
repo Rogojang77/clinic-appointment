@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from 'next/navigation'; // App Router
 import axios from "axios";
-import Cookies from "js-cookie";
 import { toast } from "react-hot-toast";
 import { useFormik, FormikHelpers } from "formik";
 import * as Yup from "yup";

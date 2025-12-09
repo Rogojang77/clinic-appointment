@@ -12,8 +12,6 @@ export async function POST(request: NextRequest) {
   try {
     await dbConnect();
 
-    console.log('Testing section update...');
-
     // Find Oradea location
     const oradeaLocation = await LocationModel.findOne({ name: 'Oradea' });
     if (!oradeaLocation) {
@@ -22,8 +20,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-
-    console.log('Oradea location ID:', oradeaLocation._id);
 
     // Find Ecografie section
     const ecografieSection = await SectionModel.findOne({ name: 'Ecografie' });
@@ -34,9 +30,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('Ecografie section ID:', ecografieSection._id);
-    console.log('Current locationId:', ecografieSection.locationId);
-
     // Update the section
     const updatedSection = await SectionModel.findByIdAndUpdate(
       ecografieSection._id,
@@ -44,17 +37,11 @@ export async function POST(request: NextRequest) {
       { new: true }
     );
 
-    console.log('Updated section:', updatedSection);
-    console.log('Updated section locationId:', updatedSection?.locationId);
-
     // Try to find the section again to see if it was saved
     const foundSection = await SectionModel.findById(ecografieSection._id);
-    console.log('Found section:', foundSection);
-    console.log('Found section locationId:', foundSection?.locationId);
 
     // Try a raw query to see if the field exists
     const rawSection = await SectionModel.collection.findOne({ _id: ecografieSection._id });
-    console.log('Raw section from database:', rawSection);
 
     return NextResponse.json({
       success: true,

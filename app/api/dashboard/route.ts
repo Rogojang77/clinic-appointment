@@ -4,10 +4,26 @@ import UserModel from '@/models/User';
 import SectionModel from '@/models/Section';
 import ActivityScheduleModel from '@/models/ActivitySchedule';
 import DoctorModel from '@/models/Doctor';
+import { requireAuth, isSuperAdmin } from '@/utils/authHelpers';
 
 // GET /api/dashboard - Get dashboard overview data
 export async function GET(request: NextRequest) {
   try {
+    // Authenticate request - only super admins can access dashboard API
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response if auth failed
+    }
+    const { payload: user } = authResult;
+
+    // Check if user is super admin
+    if (!isSuperAdmin(user)) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized: Super admin access required' },
+        { status: 403 }
+      );
+    }
+
     await dbConnect();
     
     // Get counts for each entity

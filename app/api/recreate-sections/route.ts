@@ -9,8 +9,6 @@ export async function POST(request: NextRequest) {
   try {
     await dbConnect();
 
-    console.log('Starting section recreation...');
-
     // Find locations
     const beiusLocation = await LocationModel.findOne({ name: 'Beiuș' });
     const oradeaLocation = await LocationModel.findOne({ name: 'Oradea' });
@@ -24,11 +22,9 @@ export async function POST(request: NextRequest) {
 
     // Get existing sections to preserve their data
     const existingSections = await SectionModel.find({});
-    console.log(`Found ${existingSections.length} existing sections`);
 
     // Clear existing sections
     await SectionModel.deleteMany({});
-    console.log('Cleared existing sections');
 
     // Recreate sections with locationId
     const sectionsData = [
@@ -50,11 +46,9 @@ export async function POST(request: NextRequest) {
     ];
 
     const createdSections = await SectionModel.insertMany(sectionsData);
-    console.log(`Created ${createdSections.length} sections with locationId`);
 
     // Update doctors to reference the new sections
     const doctors = await DoctorModel.find({});
-    console.log(`Found ${doctors.length} doctors to update`);
 
     let updatedDoctors = 0;
     for (const doctor of doctors) {
@@ -79,8 +73,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log(`Updated ${updatedDoctors} doctors`);
-
     // Update sections to include doctors
     for (const section of createdSections) {
       try {
@@ -94,8 +86,6 @@ export async function POST(request: NextRequest) {
         console.error(`Error updating section ${section.name}:`, sectionError);
       }
     }
-
-    console.log('Section recreation completed successfully!');
 
     return NextResponse.json({
       success: true,

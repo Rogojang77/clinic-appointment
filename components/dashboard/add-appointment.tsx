@@ -41,19 +41,19 @@ interface Appointment {
 
 // Validation schema using Yup
 const AppointmentSchema = Yup.object().shape({
-  time: Yup.string().required("Time is required"),
-  patientName: Yup.string().required("Name is required"),
-  testType: Yup.string().required("Type is required"),
-  phoneNumber: Yup.string().required("Phone number is required"),
-  doctorName: Yup.string().required("Doctor is required"),
+  time: Yup.string().required("Ora este obligatorie"),
+  patientName: Yup.string().required("Numele este obligatoriu"),
+  testType: Yup.string().required("Tipul este obligatoriu"),
+  phoneNumber: Yup.string().required("Numărul de telefon este obligatoriu"),
+  doctorName: Yup.string().required("Medicul este obligatoriu"),
   sectionId: Yup.string().when('testType', {
     is: (testType: string) => testType && testType !== 'Ecografie',
-    then: (schema) => schema.required("Section is required"),
+    then: (schema) => schema.required("Secțiunea este obligatorie"),
     otherwise: (schema) => schema.optional(),
   }),
   doctorId: Yup.string().when('testType', {
     is: (testType: string) => testType && testType !== 'Ecografie',
-    then: (schema) => schema.required("Doctor is required"),
+    then: (schema) => schema.required("Medicul este obligatoriu"),
     otherwise: (schema) => schema.optional(),
   }),
 });
@@ -125,12 +125,12 @@ export default function AppointmentAddEdit({
       fetchAppointments();
       toast.success(
         data
-          ? "Appointment Updated Successfully!"
-          : "Appointment Created Successfully!"
+          ? "Programarea a fost actualizată cu succes!"
+          : "Programarea a fost creată cu succes!"
       );
     } catch (error) {
       console.error("Error handling appointment:", error);
-      toast.error("An error occurred while handling the appointment");
+      toast.error("A apărut o eroare la procesarea programării");
     }
   };
 
@@ -153,11 +153,11 @@ export default function AppointmentAddEdit({
       );
 
       if (!response.data) {
-        toast.error("Failed to create appointment");
+        toast.error("Nu s-a putut crea programarea");
       }
     } catch (error) {
       console.error("Error creating appointment:", error);
-      toast.error("An error occurred while creating the appointment");
+      toast.error("A apărut o eroare la crearea programării");
     }
   };
 
@@ -177,7 +177,7 @@ export default function AppointmentAddEdit({
       );
     } catch (error) {
       console.error("Error updating appointment:", error);
-      toast.error("An error occurred while updating the appointment");
+      toast.error("A apărut o eroare la actualizarea programării");
     }
   };
 
@@ -188,7 +188,7 @@ export default function AppointmentAddEdit({
       setSections(response.data.data);
     } catch (error) {
       console.error("Error fetching sections:", error);
-      toast.error("Failed to load sections");
+      toast.error("Nu s-au putut încărca secțiunile");
     }
   };
 
@@ -202,7 +202,7 @@ export default function AppointmentAddEdit({
       setDoctors(response.data.data);
     } catch (error) {
       console.error("Error fetching doctors:", error);
-      toast.error("Failed to load doctors");
+      toast.error("Nu s-au putut încărca medicii");
     }
   };
 
@@ -212,7 +212,7 @@ export default function AppointmentAddEdit({
       setLocations(response.data.data);
     } catch (error) {
       console.error("Error fetching locations:", error);
-      toast.error("Failed to load locations");
+      toast.error("Nu s-au putut încărca locațiile");
       // Fallback to static data
       setLocations([
         { _id: '1', name: 'Beiuș', isActive: true },
@@ -231,7 +231,6 @@ export default function AppointmentAddEdit({
       );
       setTimeSlots(slots);
     } else {
-      console.warn("Location or selectDay is missing.");
       setTimeSlots([]);
     }
   }, [location, day, date, setTimeSlots]);
@@ -253,13 +252,13 @@ export default function AppointmentAddEdit({
         }
       );
       if (response.status === 201) {
-        toast.success("New Time Added Successfully!");
+        toast.success("Ora nouă a fost adăugată cu succes!");
         fetchTimeSlots();
         setShowTimeSelector(false);
       }
     } catch (err) {
       console.error(err);
-      toast.error("Failed to add new time");
+      toast.error("Nu s-a putut adăuga ora nouă");
     }
   };
 
@@ -288,7 +287,7 @@ export default function AppointmentAddEdit({
           <DialogContent className="min-w-[400px] max-w-[600px] max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
-                {data ? "Update" : "Add"} New Appointment For{" "}
+                {data ? "Actualizează" : "Adaugă"} Programare Nouă Pentru{" "}
                 {date?.format("D MMMM YYYY")} - {day}
               </DialogTitle>
             </DialogHeader>
@@ -321,7 +320,7 @@ export default function AppointmentAddEdit({
                       )}
                     </div>
                     <div className="w-1/2">
-                      <Label htmlFor="phoneNumber">Phone</Label>
+                      <Label htmlFor="phoneNumber">Telefon</Label>
                       <Field name="phoneNumber" as={Input} id="phoneNumber" />
                       {errors.phoneNumber && touched.phoneNumber && (
                         <div className="text-red-500">{errors.phoneNumber}</div>
@@ -350,7 +349,7 @@ export default function AppointmentAddEdit({
                         value={values.sectionId}
                         className="block w-full p-2 border border-gray-300 rounded"
                       >
-                        <option value="">Select Sectie</option>
+                        <option value="">Selectează Secțiunea</option>
                         {sections.map((section: any) => (
                           <option key={section._id} value={section._id}>
                             {section.name}
@@ -365,7 +364,7 @@ export default function AppointmentAddEdit({
 
                   {isEco ? (
                     <div>
-                      <Label htmlFor="doctorName">Doctor</Label>
+                      <Label htmlFor="doctorName">Medic</Label>
                       <Field name="doctorName" as={Input} id="doctorName" />
                       {errors.doctorName && touched.doctorName && (
                         <div className="text-red-500">{errors.doctorName}</div>
@@ -375,7 +374,7 @@ export default function AppointmentAddEdit({
                     <>
                       {selectedSection && (
                         <div>
-                          <Label htmlFor="doctorId">Doctor</Label>
+                          <Label htmlFor="doctorId">Medic</Label>
                           <Field
                             as="select"
                             name="doctorId"
@@ -389,7 +388,7 @@ export default function AppointmentAddEdit({
                             }}
                             className="block w-full p-2 border border-gray-300 rounded"
                           >
-                            <option value="">Select a doctor</option>
+                            <option value="">Selectează un medic</option>
                             {doctors.map((doctor: any) => (
                               <option key={doctor._id} value={doctor._id}>
                                 {doctor.name} {doctor.specialization && `(${doctor.specialization})`}
@@ -406,7 +405,7 @@ export default function AppointmentAddEdit({
                     </>
                   )}
                   <div>
-                    <Label>Location</Label>
+                    <Label>Locație</Label>
                     <div
                       role="group"
                       aria-labelledby="location-group"
@@ -430,7 +429,7 @@ export default function AppointmentAddEdit({
                   <div className="w-full flex space-x-10">
                     <div>
                       <Label htmlFor="time" className="pb-3">
-                        Time
+                        Ora
                       </Label>
                       <div className="flex items-center space-x-3">
                         {/* Time Type Selection */}
@@ -445,7 +444,7 @@ export default function AppointmentAddEdit({
                             }}
                             checked={showTimeSelector === false}
                           />
-                          <span className="ml-2">Select Time</span>
+                          <span className="ml-2">Selectează Ora</span>
                         </label>
 
                         {/* Add New Custom Type  */}
@@ -461,7 +460,7 @@ export default function AppointmentAddEdit({
                             checked={showTimeSelector === true}
                           />
                           <span className="ml-2">
-                            Add New Custom Time Schedule
+                            Adaugă Orar Personalizat Nou
                           </span>
                         </label>
                       </div>
@@ -473,12 +472,11 @@ export default function AppointmentAddEdit({
                             <span className="font-semibold text-red-500">
                               ***
                             </span>
-                            This is temporary time schedule. <br /> This is
-                            applicalable for :{" "}
+                            Acesta este un orar temporar. <br /> Este
+                            aplicabil pentru data:{" "}
                             <span className="font-bold text-[14px]">
                               {formattedDate}
-                            </span>{" "}
-                            date
+                            </span>
                             <span className="font-semibold text-red-500">
                               {" "}
                               ***
@@ -506,7 +504,7 @@ export default function AppointmentAddEdit({
                               onClick={handleAddTime}
                               disabled={!customTime} // Disable the Save button if no custom time is input
                             >
-                              Save
+                              Salvează
                             </button>
                           </div>
                         </div>
@@ -566,9 +564,9 @@ export default function AppointmentAddEdit({
                       className="text-[20px] font-bold text-blue-500"
                     >
                       {values?.isConfirmed ? (
-                        <span className="text-red-500">Close Reservation</span>
+                        <span className="text-red-500">Rezervare Închisă</span>
                       ) : (
-                        "Active Reservation"
+                        "Rezervare Activă"
                       )}{" "}
                     </Label>
                     <Field name="isConfirmed">
@@ -591,10 +589,10 @@ export default function AppointmentAddEdit({
                       type="submit"
                       disabled={Object.keys(errors).length > 0}
                     >
-                      {data ? "Update" : "Add"} Appointment
+                      {data ? "Actualizează" : "Adaugă"} Programare
                     </Button>
                     <Button type="button" onClick={handleModal}>
-                      Cancel
+                      Anulează
                     </Button>
                   </div>
                 </Form>

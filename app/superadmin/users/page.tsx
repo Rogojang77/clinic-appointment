@@ -38,7 +38,7 @@ export default function UsersPage() {
       setUsers(response.data.data);
     } catch (error) {
       console.error('Error fetching users:', error);
-      toast.error('Failed to load users');
+      toast.error('Nu s-au putut încărca utilizatorii');
     } finally {
       setLoading(false);
     }
@@ -50,7 +50,7 @@ export default function UsersPage() {
       setSections(response.data.data);
     } catch (error) {
       console.error('Error fetching sections:', error);
-      toast.error('Failed to load sections');
+      toast.error('Nu s-au putut încărca secțiunile');
     }
   };
 
@@ -58,21 +58,21 @@ export default function UsersPage() {
     const errors: Record<string, string> = {};
 
     if (!formData.username.trim()) {
-      errors.username = 'Username is required';
+      errors.username = 'Numele de utilizator este obligatoriu';
     }
 
     if (!formData.email.trim()) {
-      errors.email = 'Email is required';
+      errors.email = 'Email-ul este obligatoriu';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      errors.email = 'Email is invalid';
+      errors.email = 'Email-ul este invalid';
     }
 
     if (!editingUser && !formData.password.trim()) {
-      errors.password = 'Password is required for new users';
+      errors.password = 'Parola este obligatorie pentru utilizatorii noi';
     }
 
     if (!formData.accessSection) {
-      errors.accessSection = 'Section is required';
+      errors.accessSection = 'Secțiunea este obligatorie';
     }
 
     setFormErrors(errors);
@@ -104,11 +104,11 @@ export default function UsersPage() {
         }
         
         await usersApi.update(editingUser._id, updateData);
-        toast.success('User updated successfully');
+        toast.success('Utilizatorul a fost actualizat cu succes');
       } else {
         // For new users, include password
         await usersApi.create(formData);
-        toast.success('User created successfully');
+        toast.success('Utilizatorul a fost creat cu succes');
       }
 
       setModalOpen(false);
@@ -117,7 +117,7 @@ export default function UsersPage() {
       fetchUsers();
     } catch (error: any) {
       console.error('Error saving user:', error);
-      toast.error(error.response?.data?.error || 'Failed to save user');
+      toast.error(error.response?.data?.error || 'Nu s-a putut salva utilizatorul');
     }
   };
 
@@ -136,17 +136,17 @@ export default function UsersPage() {
   };
 
   const handleDelete = async (user: User) => {
-    if (!confirm(`Are you sure you want to delete user "${user.username}"?`)) {
+    if (!confirm(`Ești sigur că vrei să ștergi utilizatorul "${user.username}"?`)) {
       return;
     }
 
     try {
       await usersApi.delete(user._id);
-      toast.success('User deleted successfully');
+      toast.success('Utilizatorul a fost șters cu succes');
       fetchUsers();
     } catch (error: any) {
       console.error('Error deleting user:', error);
-      toast.error(error.response?.data?.error || 'Failed to delete user');
+      toast.error(error.response?.data?.error || 'Nu s-a putut șterge utilizatorul');
     }
   };
 
@@ -189,7 +189,7 @@ export default function UsersPage() {
     // Add "All Sections" option for SuperAdmin users
     sectionOptions.unshift({
       value: "all",
-      label: "All Sections"
+      label: "Toate Secțiunile"
     });
     
     return sectionOptions;
@@ -231,7 +231,7 @@ export default function UsersPage() {
       key: 'section',
       label: 'Section',
       sortable: false,
-      render: (value: Section) => value?.name || 'No section'
+      render: (value: Section) => value?.name || 'Fără secțiune'
     },
     {
       key: 'isverified',
@@ -243,7 +243,7 @@ export default function UsersPage() {
             ? 'bg-green-100 text-green-800' 
             : 'bg-yellow-100 text-yellow-800'
         }`}>
-          {value ? 'Verified' : 'Pending'}
+          {value ? 'Verificat' : 'În așteptare'}
         </span>
       )
     },
@@ -261,9 +261,9 @@ export default function UsersPage() {
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Users</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Utilizatori</h1>
             <p className="mt-1 text-sm text-gray-500">
-              Manage system users and their permissions
+              Gestionează utilizatorii sistemului și permisiunile lor
             </p>
           </div>
           <button
@@ -271,7 +271,7 @@ export default function UsersPage() {
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
           >
             <Plus className="h-4 w-4 mr-2" />
-            Add User
+            Adaugă Utilizator
           </button>
         </div>
 
@@ -282,14 +282,14 @@ export default function UsersPage() {
           onEdit={handleEdit}
           onDelete={handleDelete}
           loading={loading}
-          emptyMessage="No users found. Create your first user to get started."
+          emptyMessage="Nu s-au găsit utilizatori. Creează primul utilizator pentru a începe."
         />
 
         {/* Modal */}
         <Modal
           isOpen={modalOpen}
           onClose={() => setModalOpen(false)}
-          title={editingUser ? 'Edit User' : 'Add New User'}
+          title={editingUser ? 'Editează Utilizator' : 'Adaugă Utilizator Nou'}
           size="md"
         >
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -302,7 +302,7 @@ export default function UsersPage() {
                 onChange={(value) => setFormData({ ...formData, username: value })}
                 error={formErrors.username}
                 required
-                placeholder="Enter username"
+                placeholder="Introdu numele de utilizator"
               />
 
               <FormField
@@ -313,7 +313,7 @@ export default function UsersPage() {
                 onChange={(value) => setFormData({ ...formData, email: value })}
                 error={formErrors.email}
                 required
-                placeholder="Enter email"
+                placeholder="Introdu email-ul"
               />
             </div>
 
@@ -325,7 +325,7 @@ export default function UsersPage() {
               onChange={(value) => setFormData({ ...formData, password: value })}
               error={formErrors.password}
               required={!editingUser}
-              placeholder={editingUser ? "Leave blank to keep current password" : "Enter password"}
+              placeholder={editingUser ? "Lasă gol pentru a păstra parola actuală" : "Introdu parola"}
             />
 
             <FormField
@@ -375,13 +375,13 @@ export default function UsersPage() {
                 onClick={() => setModalOpen(false)}
                 className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
-                Cancel
+                Anulează
               </button>
               <button
                 type="submit"
                 className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
-                {editingUser ? 'Update' : 'Create'}
+                {editingUser ? 'Actualizează' : 'Creează'}
               </button>
             </div>
           </form>

@@ -9,8 +9,6 @@ export async function POST(request: NextRequest) {
   try {
     await dbConnect();
 
-    console.log('Adding locationId to existing sections and doctors...');
-
     // Find locations
     const beiusLocation = await LocationModel.findOne({ name: 'Beiuș' });
     const oradeaLocation = await LocationModel.findOne({ name: 'Oradea' });
@@ -27,13 +25,11 @@ export async function POST(request: NextRequest) {
       { name: { $ne: 'Ecografie' } },
       { $set: { locationId: beiusLocation._id } }
     );
-    console.log(`Updated ${sectionsResult.modifiedCount} sections to Beiuș`);
 
     const ecografieResult = await SectionModel.updateMany(
       { name: 'Ecografie' },
       { $set: { locationId: oradeaLocation._id } }
     );
-    console.log(`Updated ${ecografieResult.modifiedCount} Ecografie sections to Oradea`);
 
     // Update doctors based on their section
     const doctors = await DoctorModel.find({});
@@ -52,8 +48,6 @@ export async function POST(request: NextRequest) {
         console.error(`Error updating doctor ${doctor.name}:`, error);
       }
     }
-
-    console.log(`Updated ${updatedDoctors} doctors`);
 
     // Verify results
     const beiusSections = await SectionModel.countDocuments({ locationId: beiusLocation._id });

@@ -41,7 +41,7 @@ const AddAppointmentButton: React.FC<DateButtonProps> = ({ selectedDate, onClick
       {/* Tooltip */}
       {!isDateValid && (
         <div className="absolute top-[-40px] left-1/2 transform -translate-x-1/2 bg-gray-700 text-white text-sm rounded-md py-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
-          Please select a valid date
+          Vă rugăm să selectați o dată validă
         </div>
       )}
     </div>

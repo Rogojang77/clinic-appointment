@@ -39,6 +39,20 @@ node migrate-live-database.js
 mongorestore --uri="YOUR_MONGO_URI" --archive="./mongo-backups/backup-YYYY-MM-DD-HH-MM-SS.archive.gz" --gzip
 ```
 
+## Populate Collections from Test Database
+
+After creating the collections, populate them with data from your test database:
+
+```bash
+node populate-from-test.js
+```
+
+This will:
+- Create a backup before populating
+- Copy data from test → live for: `activityschedules`, `doctors`, `locations`, `sections`
+- Preserve relationships (ObjectIds)
+- Skip duplicates safely
+
 ## Safety
 
 - ✅ Never deletes or overwrites data

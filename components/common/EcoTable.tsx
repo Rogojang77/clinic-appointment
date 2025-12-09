@@ -1,4 +1,4 @@
-import { Edit, Trash } from "lucide-react";
+import { Edit, Trash, Loader } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -53,6 +53,8 @@ const EcoTable: React.FC<TableComponentProps> = ({
   onEdit,
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [updatingAppointmentId, setUpdatingAppointmentId] = useState<string | null>(null);
   const [appointmentToDelete, setAppointmentToDelete] =
     useState<Appointment | null>(null);
 
@@ -60,8 +62,6 @@ const EcoTable: React.FC<TableComponentProps> = ({
   const normalizeTime = (time: string) => {
     return time.padStart(5, "0"); // Normalize to "08:30" format, for example
   };
-
-  console.log(appointments);
 
   // Group appointments by timeSlot
   const appointmentsGroupedByTime = timeSlots.map((timeSlot: any) => ({
@@ -79,27 +79,33 @@ const EcoTable: React.FC<TableComponentProps> = ({
   const handleConfirm = async () => {
     if (appointmentToDelete) {
       try {
+        setIsDeleting(true);
         await axios.delete(`/api/appointments?id=${appointmentToDelete._id}`);
-        toast.success("Appointment Deleted Successfully!");
+        toast.success("Programarea a fost ștearsă cu succes!");
         fetchData();
       } catch (err) {
         console.error(err);
-        toast.error("Something went wrong!");
+        toast.error("Ceva nu a mers bine!");
+      } finally {
+        setIsDeleting(false);
+        setIsModalOpen(false);
+        setAppointmentToDelete(null);
       }
     }
-    setIsModalOpen(false);
-    setAppointmentToDelete(null);
   };
 
   const handleToggleConfirmed = async (appointmentId: string, isConfirmed: boolean) => {
     try {
+      setUpdatingAppointmentId(appointmentId);
       await axios.patch(`/api/appointments?id=${appointmentId}`, { isConfirmed });
   
-      toast.success("Appointment status updated!");
+      toast.success("Statusul programării a fost actualizat!");
       fetchData(); // Refresh data after update
     } catch (error) {
       console.error("Error updating appointment status:", error);
-      toast.error("Failed to update appointment status.");
+      toast.error("Nu s-a putut actualiza statusul programării.");
+    } finally {
+      setUpdatingAppointmentId(null);
     }
   };
   
@@ -174,15 +180,21 @@ const EcoTable: React.FC<TableComponentProps> = ({
                             </button>
                             {
                               appointment?.isConfirmed && 
-                              <Switch
-                              id="isConfirmed"
-                              checked={appointment.isConfirmed}
-                              onCheckedChange={(checked: boolean) =>
-                                handleToggleConfirmed(appointment._id, checked)
-                              }
-                              disabled={!isDateValid(appointment.date)}
-                              className="w-9"
-                            />
+                              <div className="flex items-center">
+                                {updatingAppointmentId === appointment._id ? (
+                                  <Loader className="h-4 w-4 animate-spin text-blue-500" />
+                                ) : (
+                                  <Switch
+                                    id="isConfirmed"
+                                    checked={appointment.isConfirmed}
+                                    onCheckedChange={(checked: boolean) =>
+                                      handleToggleConfirmed(appointment._id, checked)
+                                    }
+                                    disabled={!isDateValid(appointment.date) || updatingAppointmentId !== null}
+                                    className="w-9"
+                                  />
+                                )}
+                              </div>
                             }
                           </td>
                           {/* Show timeSlot only for the first appointment in the group */}
@@ -241,17 +253,24 @@ const EcoTable: React.FC<TableComponentProps> = ({
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-[425px] min-w-[400px]">
           <DialogHeader>
-            <DialogTitle>Confirm Deletion</DialogTitle>
+            <DialogTitle>Confirmă Ștergerea</DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            Are you sure you want to delete this appointment?
+            Ești sigur că vrei să ștergi această programare?
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsModalOpen(false)}>
-              Cancel
+            <Button variant="outline" onClick={() => setIsModalOpen(false)} disabled={isDeleting}>
+              Anulează
             </Button>
-            <Button variant="destructive" onClick={handleConfirm}>
-              Delete
+            <Button variant="destructive" onClick={handleConfirm} disabled={isDeleting}>
+              {isDeleting ? (
+                <>
+                  <Loader className="mr-2 h-4 w-4 animate-spin" />
+                  Se șterge...
+                </>
+              ) : (
+                "Șterge"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

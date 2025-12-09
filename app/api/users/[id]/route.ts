@@ -147,9 +147,6 @@ export async function PUT(
             { status: 400 }
           );
         }
-      } else {
-        // If it's not an ObjectId, it might be a department name (temporary)
-        console.warn(`User updated with department name as accessSection: ${accessSection}`);
       }
     }
     

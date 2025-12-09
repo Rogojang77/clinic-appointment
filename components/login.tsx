@@ -8,7 +8,7 @@ import { useState } from "react";
 import toast from "react-hot-toast";
 import { useUserStore } from "@/store/store";
 import { useAuthEffect } from "@/hook/useAuthEffect";
-import Cookies from "js-cookie";
+import { setToken } from "@/utils/tokenStorage";
 import { Eye, EyeOff } from "lucide-react";
 
 const signInSchema = Yup.object().shape({
@@ -33,8 +33,8 @@ const SignIn = () => {
       if (response.status === 200) {
         const { user, token } = response.data;
         setUser(user);
-        // Set the token in cookies
-        Cookies.set("token", token, { expires: 7 });
+        // Store the token in localStorage
+        setToken(token);
         router.push("/dashboard");
         toast.success("Signin Successfully!");
       } else {

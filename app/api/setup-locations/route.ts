@@ -9,11 +9,8 @@ export async function POST(request: NextRequest) {
   try {
     await dbConnect();
 
-    console.log('Starting location setup...');
-
     // Clear existing locations
     await LocationModel.deleteMany({});
-    console.log('Cleared existing locations');
 
     // Create locations
     const locations = [
@@ -22,7 +19,6 @@ export async function POST(request: NextRequest) {
     ];
 
     const createdLocations = await LocationModel.insertMany(locations);
-    console.log(`Created ${createdLocations.length} locations`);
 
     // Find location IDs
     const beiusLocation = await LocationModel.findOne({ name: 'Beiuș' });
@@ -32,12 +28,8 @@ export async function POST(request: NextRequest) {
       throw new Error('Failed to create locations');
     }
 
-    console.log('Beiuș location ID:', beiusLocation._id);
-    console.log('Oradea location ID:', oradeaLocation._id);
-
     // Get all sections
     const sections = await SectionModel.find({});
-    console.log(`Found ${sections.length} sections to update`);
 
     // Assign locations to sections
     for (const section of sections) {
@@ -45,12 +37,10 @@ export async function POST(request: NextRequest) {
       const locationId = section.name === 'Ecografie' ? oradeaLocation._id : beiusLocation._id;
       
       await SectionModel.findByIdAndUpdate(section._id, { locationId });
-      console.log(`Updated section "${section.name}" to location: ${section.name === 'Ecografie' ? 'Oradea' : 'Beiuș'}`);
     }
 
     // Get all doctors
     const doctors = await DoctorModel.find({});
-    console.log(`Found ${doctors.length} doctors to update`);
 
     // Assign locations to doctors based on their section
     for (const doctor of doctors) {
@@ -59,11 +49,8 @@ export async function POST(request: NextRequest) {
         const locationId = section.name === 'Ecografie' ? oradeaLocation._id : beiusLocation._id;
         
         await DoctorModel.findByIdAndUpdate(doctor._id, { locationId });
-        console.log(`Updated doctor "${doctor.name}" to location: ${section.name === 'Ecografie' ? 'Oradea' : 'Beiuș'}`);
       }
     }
-
-    console.log('Location setup completed successfully!');
     
     // Verify the results
     const beiusSections = await SectionModel.find({ locationId: beiusLocation._id });

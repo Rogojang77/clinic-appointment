@@ -1,21 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/utils/mongodb";
 import ColorsModel from "@/models/Colors";
-import { verifyJWT } from "@/utils/jwtUtils";
+import { requireAuth } from "@/utils/authHelpers";
 
 export async function GET(request: NextRequest) {
   try {
-    // Validate JWT token first (before DB connection)
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return NextResponse.json({ message: "Authentication required!" }, { status: 401 });
+    // Authenticate request using the new auth helper
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response if auth failed
     }
-
-    // Decode and verify JWT token
-    const decoded = await verifyJWT(token);
-    if (!decoded) {
-      return NextResponse.json({ message: "Invalid or expired token!" }, { status: 401 });
-    }
+    const { payload: user } = authResult;
 
     // Connect to DB
     await dbConnect();

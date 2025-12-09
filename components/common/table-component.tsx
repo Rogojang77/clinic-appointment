@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Eye, Edit, Trash } from "lucide-react";
+import { Eye, Edit, Trash, Loader } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -54,6 +54,7 @@ const TableComponent: React.FC<TableComponentProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedRows, setSelectedRows] = useState<number[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [appointmentToDelete, setAppointmentToDelete] =
     useState<Appointment | null>(null);
 
@@ -79,16 +80,19 @@ const TableComponent: React.FC<TableComponentProps> = ({
   const handleConfirm = async () => {
     if (appointmentToDelete) {
       try {
+        setIsDeleting(true);
         await axios.delete(`/api/appointments?id=${appointmentToDelete?._id}`);
-        toast.success("Appointment Deleted Successfully !");
+        toast.success("Programarea a fost ștearsă cu succes!");
         fetchData();
       } catch (err) {
         console.error(err);
-        toast.error("Something went wrong !");
+        toast.error("Ceva nu a mers bine!");
+      } finally {
+        setIsDeleting(false);
+        setIsModalOpen(false);
+        setAppointmentToDelete(null);
       }
     }
-    setIsModalOpen(false);
-    setAppointmentToDelete(null);
   };
 
   return (
@@ -190,17 +194,17 @@ const TableComponent: React.FC<TableComponentProps> = ({
               disabled={currentPage === 1}
               className="px-4 py-2 bg-gray-200 text-gray-700 rounded disabled:opacity-50"
             >
-              Previous
+              Anterior
             </button>
             <span className="text-sm text-gray-700">
-              Page {currentPage} of {totalPages}
+              Pagina {currentPage} din {totalPages}
             </span>
             <button
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
               className="px-4 py-2 bg-gray-200 text-gray-700 rounded disabled:opacity-50"
             >
-              Next
+              Următor
             </button>
           </div>
         </>
@@ -214,17 +218,24 @@ const TableComponent: React.FC<TableComponentProps> = ({
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-[425px] min-w-[400px]">
           <DialogHeader>
-            <DialogTitle>Confirm Deletion</DialogTitle>
+            <DialogTitle>Confirmă Ștergerea</DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            Are you sure you want to delete this appointment?
+            Ești sigur că vrei să ștergi această programare?
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsModalOpen(false)}>
-              Cancel
+            <Button variant="outline" onClick={() => setIsModalOpen(false)} disabled={isDeleting}>
+              Anulează
             </Button>
-            <Button variant="destructive" onClick={handleConfirm}>
-              Delete
+            <Button variant="destructive" onClick={handleConfirm} disabled={isDeleting}>
+              {isDeleting ? (
+                <>
+                  <Loader className="mr-2 h-4 w-4 animate-spin" />
+                  Se șterge...
+                </>
+              ) : (
+                "Șterge"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

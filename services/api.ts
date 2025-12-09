@@ -8,19 +8,45 @@ const api = axios.create({
   },
 });
 
-// Add request interceptor to include auth token
+// Add request interceptor to include auth token from localStorage
 api.interceptors.request.use((config) => {
-  const token = document.cookie
-    .split('; ')
-    .find(row => row.startsWith('token='))
-    ?.split('=')[1];
-  
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  // Get token from localStorage (client-side only)
+  if (typeof window !== 'undefined') {
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    } catch (error) {
+      console.error('Error reading token from localStorage:', error);
+    }
   }
   
   return config;
 });
+
+// Add response interceptor to handle token expiration
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // If we get a 401, the token might be expired
+    if (error.response?.status === 401) {
+      // Clear token from localStorage
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.removeItem('auth_token');
+          // Redirect to login if we're not already there
+          if (window.location.pathname !== '/') {
+            window.location.href = '/?session=expired';
+          }
+        } catch (err) {
+          console.error('Error clearing token:', err);
+        }
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 // API Types
 export interface Section {
@@ -125,7 +151,6 @@ export const sectionsApi = {
     }
     const queryString = params.toString();
     const url = `/sections${queryString ? `?${queryString}` : ''}`;
-    console.log('sectionsApi.getAll URL:', url, 'Options:', options);
     return api.get<{ success: boolean; data: Section[] }>(url);
   },
   

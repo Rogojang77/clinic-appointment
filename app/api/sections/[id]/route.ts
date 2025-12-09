@@ -28,7 +28,6 @@ export async function GET(
       try {
         await section.populate('doctors', 'name email specialization isActive');
       } catch (populateError) {
-        console.warn('Could not populate doctors for section:', populateError);
         // Continue without populated doctors
       }
     }
@@ -149,7 +148,7 @@ export async function PUT(
         }).select('name isActive');
         sectionObj.locations = populatedLocations.map(loc => loc.toObject());
       } catch (locationError) {
-        console.warn('Could not populate locations for section:', locationError);
+        // Silently skip if locations cannot be populated
       }
     }
     
@@ -167,7 +166,7 @@ export async function PUT(
           isActive: doctor.isActive
         }));
       } catch (doctorError) {
-        console.warn('Could not populate doctors for section:', doctorError);
+        // Silently skip if doctors cannot be populated
       }
     }
     
@@ -193,7 +192,6 @@ export async function PUT(
           );
         }
       } catch (doctorError) {
-        console.warn('Could not update doctor assignments:', doctorError);
         // Continue without failing the section update
       }
     }
@@ -243,7 +241,6 @@ export async function DELETE(
         { $unset: { sectionId: 1 } }
       );
     } catch (doctorError) {
-      console.warn('Could not remove section from doctors:', doctorError);
       // Continue with section deletion
     }
     

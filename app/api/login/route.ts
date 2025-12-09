@@ -28,10 +28,10 @@ export async function POST(request: NextRequest) {
    
     if(isPasswordValid){
       const tokenData = {
-        id:user._id,
-        email:user.email,
-        username:user.username,
-        role:user.role,
+        id: String(user._id),
+        email: user.email,
+        username: user.username,
+        role: user.role,
         isAdmin: user.role === 'admin' || false
       }
 
@@ -52,13 +52,16 @@ export async function POST(request: NextRequest) {
         isAdmin: user.role === 'admin' || false,
       };
   
-      const loginResponse = NextResponse.json(
-        { message: "Login Successfull !", user: userResponse, token },
+      // Return token in response body (client will store in localStorage)
+      return NextResponse.json(
+        { 
+          message: "Login Successfull !", 
+          user: userResponse, 
+          token,
+          expiresIn: 7 * 24 * 60 * 60 // 7 days in seconds
+        },
         { status: 200 }
       );
-  
-      loginResponse.cookies.set('token', token, {httpOnly: true});
-      return loginResponse
     }
     else{
       return NextResponse.json(

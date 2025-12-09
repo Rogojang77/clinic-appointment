@@ -1,7 +1,6 @@
 import dbConnect from "@/utils/mongodb";
 import { NextRequest, NextResponse } from "next/server";
-
-import { verifyJWT } from "@/utils/jwtUtils"; 
+import { requireAuth } from "@/utils/authHelpers";
 import NotesModel from "@/models/Notes";
 
 export async function GET(request: NextRequest) {
@@ -12,20 +11,10 @@ export async function GET(request: NextRequest) {
   const location = searchParams.get("location");
 
   try {
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return NextResponse.json(
-        { message: "Authentication required!" },
-        { status: 401 }
-      );
-    }
-
-    const decoded = await verifyJWT(token);
-    if (!decoded) {
-      return NextResponse.json(
-        { message: "Invalid or expired token!" },
-        { status: 401 }
-      );
+    // Authenticate request
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response if auth failed
     }
 
     const filter: any = {};
@@ -44,22 +33,10 @@ export async function POST(request: NextRequest) {
   await dbConnect();
   const { date, notes, location } = await request.json();
   try {
-    // Validate JWT token
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return NextResponse.json(
-        { message: "Authentication required!" },
-        { status: 401 }
-      );
-    }
-
-    // Decode and verify JWT token
-    const decoded = await verifyJWT(token);
-    if (!decoded) {
-      return NextResponse.json(
-        { message: "Invalid or expired token!" },
-        { status: 401 }
-      );
+    // Authenticate request
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response if auth failed
     }
 
     // Create new note with location
@@ -94,20 +71,11 @@ export async function PATCH(request: NextRequest) {
     }
 
     const updatedData = await request.json();
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return NextResponse.json(
-        { message: "Authentication required!" },
-        { status: 401 }
-      );
-    }
-
-    const decoded = await verifyJWT(token);
-    if (!decoded) {
-      return NextResponse.json(
-        { message: "Invalid or expired token!" },
-        { status: 401 }
-      );
+    
+    // Authenticate request
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response if auth failed
     }
 
     const updatedNotes = await NotesModel.findByIdAndUpdate(

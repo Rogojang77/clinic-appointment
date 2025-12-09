@@ -1,7 +1,7 @@
 import dbConnect from "@/utils/mongodb";
 import { NextRequest, NextResponse } from "next/server";
 import LocationScheduleModel from "@/models/LocationSchedule";
-import { verifyJWT } from "@/utils/jwtUtils";
+import { requireAuth } from "@/utils/authHelpers";
 
 interface Schedule {
   [day: string]: { date: string; time: string; _id: string }[];
@@ -74,9 +74,15 @@ interface LocationSchedule {
 // POST API: Create a new schedule
 
 export async function GET(request: NextRequest) {
-  await dbConnect();
-
   try {
+    // Authenticate request
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response if auth failed
+    }
+
+    await dbConnect();
+
     const { searchParams } = new URL(request.url);
     const location = searchParams.get("location");
     const day = searchParams.get("day");
@@ -140,24 +146,14 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  await dbConnect();
-
   try {
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return NextResponse.json(
-        { message: "Authentication required!" },
-        { status: 401 }
-      );
+    // Authenticate request
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response if auth failed
     }
 
-    const decoded = await verifyJWT(token);
-    if (!decoded) {
-      return NextResponse.json(
-        { message: "Invalid or expired token!" },
-        { status: 401 }
-      );
-    }
+    await dbConnect();
 
     const { location, day, timeSlot } = await request.json();
 
@@ -209,30 +205,20 @@ export async function POST(request: NextRequest) {
 
 // PATCH API: Update an existing schedule
 export async function PATCH(request: NextRequest) {
-  await dbConnect();
-
   try {
+    // Authenticate request
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response if auth failed
+    }
+
+    await dbConnect();
+
     const id = request.nextUrl.searchParams.get("id");
     if (!id) {
       return NextResponse.json(
         { message: "Schedule ID is required!" },
         { status: 400 }
-      );
-    }
-
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return NextResponse.json(
-        { message: "Authentication required!" },
-        { status: 401 }
-      );
-    }
-
-    const decoded = await verifyJWT(token);
-    if (!decoded) {
-      return NextResponse.json(
-        { message: "Invalid or expired token!" },
-        { status: 401 }
       );
     }
 
@@ -262,24 +248,14 @@ export async function PATCH(request: NextRequest) {
 
 // DELETE API: Delete a schedule
 export async function DELETE(request: NextRequest) {
-  await dbConnect();
-
   try {
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return NextResponse.json(
-        { message: "Authentication required!" },
-        { status: 401 }
-      );
+    // Authenticate request
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response if auth failed
     }
 
-    const decoded = await verifyJWT(token);
-    if (!decoded) {
-      return NextResponse.json(
-        { message: "Invalid or expired token!" },
-        { status: 401 }
-      );
-    }
+    await dbConnect();
 
     const { location, day, timeSlot } = await request.json();
 

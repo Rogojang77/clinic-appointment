@@ -115,10 +115,6 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           );
         }
-      } else {
-        // If it's not an ObjectId, it might be a department name (temporary)
-        // Allow it for now, but log a warning
-        console.warn(`User created with department name as accessSection: ${accessSection}`);
       }
     }
     

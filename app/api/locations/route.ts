@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/utils/mongodb';
 import LocationModel from '@/models/Location';
+import { requireAuth } from '@/utils/authHelpers';
 
 // GET /api/locations - Get all available locations
 export async function GET(request: NextRequest) {
   try {
+    // Authenticate request
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response if auth failed
+    }
+
     await dbConnect();
     
     const { searchParams } = new URL(request.url);
@@ -29,6 +36,12 @@ export async function GET(request: NextRequest) {
 // POST /api/locations - Create a new location
 export async function POST(request: NextRequest) {
   try {
+    // Authenticate request
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) {
+      return authResult; // Return error response if auth failed
+    }
+
     await dbConnect();
     
     const body = await request.json();

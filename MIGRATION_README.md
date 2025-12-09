@@ -147,6 +147,23 @@ The script creates the following indexes based on your model definitions:
 - Collections are created empty if they don't exist
 - The script will skip operations that have already been completed
 
+## Populating Collections from Test Database
+
+After running the initial migration script, you can populate the new collections with data from your test database using:
+
+```bash
+node populate-from-test.js
+```
+
+This script will:
+1. Create a backup of the live database
+2. Copy data from test database collections: `activityschedules`, `doctors`, `locations`, `sections`
+3. Preserve ObjectIds to maintain relationships
+4. Skip duplicates (won't overwrite existing data)
+5. Migrate in correct order: locations → sections → doctors → activityschedules
+
+**Note:** Make sure `MONGO_URI` is set to your live database connection string. The test database URI is configured in the script or can be set via `MONGO_URI_TEST` environment variable.
+
 ## Support
 
 If you encounter any issues:

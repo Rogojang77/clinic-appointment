@@ -2,9 +2,13 @@ import axios from "axios";
 
 export const fetchAppointmentsAPI = async (filters:any) => {
   try {
+    // Get token from localStorage and add to headers
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    
     const response = await axios.get("/api/appointments", {
       params: filters,
-      withCredentials: true,
+      headers,
     });
 
     if (response.data?.success) {
