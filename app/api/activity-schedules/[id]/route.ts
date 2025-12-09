@@ -1,11 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import mongoose from "mongoose";
 import dbConnect from "@/utils/mongodb";
 import ActivityScheduleModel from "@/models/ActivitySchedule";
 
 // GET /api/activity-schedules/[id]
 export async function GET(
-  req: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
@@ -47,7 +47,7 @@ export async function GET(
 
 // PUT /api/activity-schedules/[id]
 export async function PUT(
-  req: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
@@ -62,7 +62,7 @@ export async function PUT(
       );
     }
 
-    const body = await req.json();
+    const body = await request.json();
     const { schedule, isActive, userId, sectionId } = body;
 
     const existingSchedule = await ActivityScheduleModel.findById(id);
@@ -149,7 +149,7 @@ export async function PUT(
 
 // DELETE /api/activity-schedules/[id]
 export async function DELETE(
-  req: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
