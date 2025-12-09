@@ -3,18 +3,14 @@ import dbConnect from '@/utils/mongodb';
 import ActivityScheduleModel from '@/models/ActivitySchedule';
 import mongoose from 'mongoose';
 
-type RouteContext = {
-  params: Promise<{ id: string }>;
-};
-
 // GET /api/activity-schedules/[id] - Get a specific activity schedule
 export async function GET(
-  request: NextRequest,
-  context: RouteContext
+  req: Request,
+  { params }: { params: { id: string } }
 ) {
+  const { id } = await params;
   try {
     await dbConnect();
-    const { id } = await context.params;
     
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
@@ -49,12 +45,15 @@ export async function GET(
 
 // PUT /api/activity-schedules/[id] - Update an activity schedule
 export async function PUT(
-  request: NextRequest,
-  context: RouteContext
+  req: Request,
+  { params }: { params: { id: string } }
 ) {
+  const id = params.id;
+  const body = await req.json();
   try {
     await dbConnect();
-    const { id } = await context.params;
+    const params = await context.params;
+    const { id } = params;
     
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
@@ -136,12 +135,14 @@ export async function PUT(
 
 // DELETE /api/activity-schedules/[id] - Delete an activity schedule
 export async function DELETE(
-  request: NextRequest,
-  context: RouteContext
+  req: Request,
+  { params }: { params: { id: string } }
 ) {
+  const id = params.id;
   try {
     await dbConnect();
-    const { id } = await context.params;
+    const params = await context.params;
+    const { id } = params;
     
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
