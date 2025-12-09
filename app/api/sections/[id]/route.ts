@@ -8,11 +8,11 @@ import mongoose from 'mongoose';
 // GET /api/sections/[id] - Get a specific section
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: any
 ) {
   try {
     await dbConnect();
-    const { id } = await params;
+    const { id } = context.params;
     
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
@@ -56,11 +56,11 @@ export async function GET(
 // PUT /api/sections/[id] - Update a section
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: any
 ) {
   try {
     await dbConnect();
-    const { id } = await params;
+    const { id } = context.params;
     
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
@@ -214,11 +214,11 @@ export async function PUT(
 // DELETE /api/sections/[id] - Delete a section
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: any
 ) {
   try {
     await dbConnect();
-    const { id } = await params;
+    const { id } = context.params;
     
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(

@@ -7,11 +7,11 @@ import mongoose from 'mongoose';
 // GET /api/doctors/[id] - Get a specific doctor
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: any
 ) {
   try {
     await dbConnect();
-    const { id } = await params;
+    const { id } = context.params;
     
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
@@ -53,11 +53,11 @@ export async function GET(
 // PUT /api/doctors/[id] - Update a doctor
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: any
 ) {
   try {
     await dbConnect();
-    const { id } = await params;
+    const { id } = context.params;
     
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
@@ -190,11 +190,11 @@ export async function PUT(
 // DELETE /api/doctors/[id] - Delete a doctor
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: any
 ) {
   try {
     await dbConnect();
-    const { id } = await params;
+    const { id } = context.params;
     
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(

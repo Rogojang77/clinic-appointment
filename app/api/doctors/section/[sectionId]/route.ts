@@ -7,11 +7,11 @@ import mongoose from 'mongoose';
 // GET /api/doctors/section/[sectionId] - Get all doctors for a specific section
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ sectionId: string }> }
+  context: any
 ) {
   try {
     await dbConnect();
-    const { sectionId } = await params;
+    const { sectionId } = context.params;
     
     if (!mongoose.Types.ObjectId.isValid(sectionId)) {
       return NextResponse.json(

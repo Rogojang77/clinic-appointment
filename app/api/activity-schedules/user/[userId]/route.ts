@@ -7,11 +7,11 @@ import mongoose from 'mongoose';
 // GET /api/activity-schedules/user/[userId] - Get all activity schedules for a specific user
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ userId: string }> }
+  context: any
 ) {
   try {
     await dbConnect();
-    const { userId } = await params;
+    const { userId } = context.params;
     
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return NextResponse.json(

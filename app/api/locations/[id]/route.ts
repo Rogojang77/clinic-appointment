@@ -5,11 +5,11 @@ import LocationModel from '@/models/Location';
 // GET /api/locations/[id] - Get a specific location
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: any
 ) {
   try {
     await dbConnect();
-    const { id } = await params;
+    const { id } = context.params;
     
     if (!id || id === 'undefined') {
       return NextResponse.json(
@@ -43,11 +43,11 @@ export async function GET(
 // PUT /api/locations/[id] - Update a specific location
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: any
 ) {
   try {
     await dbConnect();
-    const { id } = await params;
+    const { id } = context.params;
     
     if (!id || id === 'undefined') {
       return NextResponse.json(
@@ -87,7 +87,7 @@ export async function PUT(
       success: true,
       data: updatedLocation
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating location:', error);
     if (error.code === 11000) {
       return NextResponse.json(
@@ -105,11 +105,11 @@ export async function PUT(
 // DELETE /api/locations/[id] - Delete a specific location
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: any
 ) {
   try {
     await dbConnect();
-    const { id } = await params;
+    const { id } = context.params;
     
     if (!id || id === 'undefined') {
       return NextResponse.json(
