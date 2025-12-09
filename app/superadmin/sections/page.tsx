@@ -1,13 +1,20 @@
 "use client";
-import { useEffect, useState } from 'react';
-import SuperAdminLayout from '@/components/superadmin/SuperAdminLayout';
-import DataTable from '@/components/superadmin/DataTable';
-import Modal from '@/components/superadmin/Modal';
-import FormField from '@/components/superadmin/FormField';
-import { sectionsApi, doctorsApi, locationsApi, Section, Doctor, Location } from '@/services/api';
-import { departmentsData } from '@/lib/department';
-import toast from 'react-hot-toast';
-import { Plus, UserCheck, Edit, Trash2 } from 'lucide-react';
+import { useEffect, useState } from "react";
+import SuperAdminLayout from "@/components/superadmin/SuperAdminLayout";
+import DataTable from "@/components/superadmin/DataTable";
+import Modal from "@/components/superadmin/Modal";
+import FormField from "@/components/superadmin/FormField";
+import {
+  sectionsApi,
+  doctorsApi,
+  locationsApi,
+  Section,
+  Doctor,
+  Location,
+} from "@/services/api";
+import { departmentsData } from "@/lib/department";
+import toast from "react-hot-toast";
+import { Plus, UserCheck, Edit, Trash2 } from "lucide-react";
 
 export default function SectionsPage() {
   const [sections, setSections] = useState<Section[]>([]);
@@ -18,11 +25,11 @@ export default function SectionsPage() {
   const [editingSection, setEditingSection] = useState<Section | null>(null);
   const [showDepartments, setShowDepartments] = useState(false);
   const [formData, setFormData] = useState({
-    name: '',
-    description: '',
+    name: "",
+    description: "",
     locationIds: [] as string[],
     isActive: true,
-    doctors: [] as string[]
+    doctors: [] as string[],
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
@@ -36,10 +43,10 @@ export default function SectionsPage() {
     try {
       setLoading(true);
       const response = await sectionsApi.getAll();
-      
+
       if (response.data && response.data.data) {
         setSections(response.data.data);
-        
+
         // If no sections exist, show departments
         if (response.data.data.length === 0) {
           setShowDepartments(true);
@@ -47,13 +54,13 @@ export default function SectionsPage() {
           setShowDepartments(false);
         }
       } else {
-        console.error('Invalid response structure:', response);
-        toast.error('Invalid response from server');
+        console.error("Invalid response structure:", response);
+        toast.error("Invalid response from server");
         setShowDepartments(true);
       }
     } catch (error) {
-      console.error('Error fetching sections:', error);
-      toast.error('Failed to load sections');
+      console.error("Error fetching sections:", error);
+      toast.error("Failed to load sections");
       setShowDepartments(true);
     } finally {
       setLoading(false);
@@ -65,7 +72,7 @@ export default function SectionsPage() {
       const response = await doctorsApi.getAll();
       setDoctors(response.data.data);
     } catch (error) {
-      console.error('Error fetching doctors:', error);
+      console.error("Error fetching doctors:", error);
     }
   };
 
@@ -74,8 +81,8 @@ export default function SectionsPage() {
       const response = await locationsApi.getAll();
       setLocations(response.data.data);
     } catch (error) {
-      console.error('Error fetching locations:', error);
-      toast.error('Failed to load locations');
+      console.error("Error fetching locations:", error);
+      toast.error("Failed to load locations");
     }
   };
 
@@ -83,11 +90,11 @@ export default function SectionsPage() {
     const errors: Record<string, string> = {};
 
     if (!formData.name.trim()) {
-      errors.name = 'Section name is required';
+      errors.name = "Section name is required";
     }
 
     if (!formData.locationIds || formData.locationIds.length === 0) {
-      errors.locationIds = 'At least one location is required';
+      errors.locationIds = "At least one location is required";
     }
 
     setFormErrors(errors);
@@ -104,10 +111,10 @@ export default function SectionsPage() {
     try {
       if (editingSection) {
         await sectionsApi.update(editingSection._id, formData);
-        toast.success('Section updated successfully');
+        toast.success("Section updated successfully");
       } else {
         await sectionsApi.create(formData);
-        toast.success('Section created successfully');
+        toast.success("Section created successfully");
       }
 
       setModalOpen(false);
@@ -115,47 +122,55 @@ export default function SectionsPage() {
       resetForm();
       fetchSections();
     } catch (error: any) {
-      console.error('Error saving section:', error);
-      toast.error(error.response?.data?.error || 'Failed to save section');
+      console.error("Error saving section:", error);
+      toast.error(error.response?.data?.error || "Failed to save section");
     }
   };
 
   const handleEdit = (section: Section) => {
     setEditingSection(section);
-    
+
     // Handle both new locationIds array and legacy locationId field
     let locationIds: string[] = [];
     if (section.locationIds && Array.isArray(section.locationIds)) {
-      locationIds = section.locationIds.map((loc: any) => 
-        typeof loc === 'string' ? loc : loc._id || loc
+      locationIds = section.locationIds.map((loc: any) =>
+        typeof loc === "string" ? loc : loc._id || loc
       );
     } else if (section.locationId) {
       // Legacy support: convert single locationId to array
-      locationIds = [typeof section.locationId === 'string' ? section.locationId : section.locationId._id || ''];
+      locationIds = [
+        typeof section.locationId === "string"
+          ? section.locationId
+          : section.locationId._id || "",
+      ];
     }
-    
+
     setFormData({
       name: section.name,
-      description: section.description || '',
+      description: section.description || "",
       locationIds: locationIds,
       isActive: section.isActive,
-      doctors: (section as any).doctors?.map((doctor: any) => doctor._id) || []
+      doctors: (section as any).doctors?.map((doctor: any) => doctor._id) || [],
     });
     setModalOpen(true);
   };
 
   const handleDelete = async (section: Section) => {
-    if (!confirm(`Are you sure you want to delete section "${section.name}"? This will also remove all associated doctors.`)) {
+    if (
+      !confirm(
+        `Are you sure you want to delete section "${section.name}"? This will also remove all associated doctors.`
+      )
+    ) {
       return;
     }
 
     try {
       await sectionsApi.delete(section._id);
-      toast.success('Section deleted successfully');
+      toast.success("Section deleted successfully");
       fetchSections();
     } catch (error: any) {
-      console.error('Error deleting section:', error);
-      toast.error(error.response?.data?.error || 'Failed to delete section');
+      console.error("Error deleting section:", error);
+      toast.error(error.response?.data?.error || "Failed to delete section");
     }
   };
 
@@ -167,11 +182,11 @@ export default function SectionsPage() {
 
   const resetForm = () => {
     setFormData({
-      name: '',
-      description: '',
+      name: "",
+      description: "",
       locationIds: [],
       isActive: true,
-      doctors: []
+      doctors: [],
     });
     setFormErrors({});
   };
@@ -179,33 +194,41 @@ export default function SectionsPage() {
   const createDepartmentsAsSections = async () => {
     try {
       // Get first active location as default
-      const defaultLocation = locations.find((loc: any) => loc.isActive) || locations[0];
+      const defaultLocation =
+        locations.find((loc: any) => loc.isActive) || locations[0];
       if (!defaultLocation) {
-        toast.error('No locations available. Please create a location first.');
+        toast.error("No locations available. Please create a location first.");
         return;
       }
-      
+
       // Create sections from departments
       for (const department of departmentsData) {
         await sectionsApi.create({
           name: department.name,
           description: `Medical department for ${department.name.toLowerCase()}`,
           isActive: true,
-          locationIds: [defaultLocation._id]
+          locationIds: [defaultLocation._id],
         });
       }
-      toast.success('Sections created from departments successfully');
+      toast.success("Sections created from departments successfully");
       fetchSections();
     } catch (error: any) {
-      console.error('Error creating sections from departments:', error);
-      toast.error(error.response?.data?.error || 'Failed to create sections from departments');
+      console.error("Error creating sections from departments:", error);
+      toast.error(
+        error.response?.data?.error ||
+          "Failed to create sections from departments"
+      );
     }
   };
 
   const getDoctorsForSection = (sectionId: string) => {
-    return doctors.filter(doctor => {
-      return (typeof doctor.sectionId === 'string' && doctor.sectionId === sectionId) ||
-             (typeof doctor.sectionId === 'object' && doctor.sectionId?._id?.toString() === sectionId);
+    return doctors.filter((doctor) => {
+      return (
+        (typeof doctor.sectionId === "string" &&
+          doctor.sectionId === sectionId) ||
+        (typeof doctor.sectionId === "object" &&
+          doctor.sectionId?._id?.toString() === sectionId)
+      );
     });
   };
 
@@ -220,24 +243,29 @@ export default function SectionsPage() {
   const getAvailableDoctors = () => {
     // If editing a section, show doctors from that section + unassigned doctors
     if (editingSection) {
-      return doctors.filter(doctor => {
+      return doctors.filter((doctor) => {
         // Check if doctor is assigned to this section or is unassigned
-        const isAssignedToThisSection = 
-          (typeof doctor.sectionId === 'string' && doctor.sectionId === editingSection._id) ||
-          (typeof doctor.sectionId === 'object' && doctor.sectionId?._id?.toString() === editingSection._id.toString());
+        const isAssignedToThisSection =
+          (typeof doctor.sectionId === "string" &&
+            doctor.sectionId === editingSection._id) ||
+          (typeof doctor.sectionId === "object" &&
+            doctor.sectionId?._id?.toString() ===
+              editingSection._id.toString());
         const isUnassigned = !doctor.sectionId || doctor.sectionId === null;
         return isAssignedToThisSection || isUnassigned;
       });
     }
     // If creating new section, show all unassigned doctors
-    return doctors.filter(doctor => !doctor.sectionId || doctor.sectionId === null);
+    return doctors.filter(
+      (doctor) => !doctor.sectionId || doctor.sectionId === null
+    );
   };
 
   const handleDoctorToggle = (doctorId: string) => {
     const newDoctors = formData.doctors.includes(doctorId)
-      ? formData.doctors.filter(id => id !== doctorId)
+      ? formData.doctors.filter((id) => id !== doctorId)
       : [...formData.doctors, doctorId];
-    
+
     setFormData({ ...formData, doctors: newDoctors });
   };
 
@@ -245,7 +273,7 @@ export default function SectionsPage() {
     // Handle both new locationIds array and legacy locationId field
     if (section.locationIds && Array.isArray(section.locationIds)) {
       return section.locationIds.map((loc: any) => {
-        if (typeof loc === 'string') {
+        if (typeof loc === "string") {
           const location = locations.find((l: any) => l._id === loc);
           return location ? location.name : loc;
         }
@@ -253,8 +281,10 @@ export default function SectionsPage() {
       });
     } else if (section.locationId) {
       // Legacy support
-      if (typeof section.locationId === 'string') {
-        const location = locations.find((l: any) => l._id === section.locationId);
+      if (typeof section.locationId === "string") {
+        const location = locations.find(
+          (l: any) => l._id === section.locationId
+        );
         return location ? [location.name] : [section.locationId];
       }
       return [section.locationId.name || section.locationId._id];
@@ -264,19 +294,19 @@ export default function SectionsPage() {
 
   const columns = [
     {
-      key: 'name',
-      label: 'Section Name',
-      sortable: true
-    },
-    {
-      key: 'description',
-      label: 'Description',
+      key: "name",
+      label: "Section Name",
       sortable: true,
-      render: (value: string) => value || '-'
     },
     {
-      key: 'locations',
-      label: 'Locations',
+      key: "description",
+      label: "Description",
+      sortable: true,
+      render: (value: string) => value || "-",
+    },
+    {
+      key: "locations",
+      label: "Locations",
       sortable: false,
       render: (value: any, row: Section) => {
         const locationNames = getSectionLocations(row);
@@ -286,7 +316,7 @@ export default function SectionsPage() {
         return (
           <div className="flex flex-wrap gap-1">
             {locationNames.map((name: string, index: number) => (
-              <span 
+              <span
                 key={index}
                 className="inline-flex items-center px-2 py-1 rounded text-xs bg-blue-100 text-blue-800"
               >
@@ -295,11 +325,11 @@ export default function SectionsPage() {
             ))}
           </div>
         );
-      }
+      },
     },
     {
-      key: 'doctors',
-      label: 'Doctors',
+      key: "doctors",
+      label: "Doctors",
       sortable: true,
       render: (value: any, row: Section) => {
         const doctorCount = getSectionDoctorCount(row);
@@ -307,58 +337,65 @@ export default function SectionsPage() {
           <div className="flex items-center">
             <UserCheck className="h-4 w-4 mr-1 text-gray-400" />
             <span className="text-sm text-gray-600">
-              {doctorCount} doctor{doctorCount !== 1 ? 's' : ''}
+              {doctorCount} doctor{doctorCount !== 1 ? "s" : ""}
             </span>
           </div>
         );
-      }
+      },
     },
     {
-      key: 'isActive',
-      label: 'Status',
+      key: "isActive",
+      label: "Status",
       sortable: true,
       render: (value: boolean) => (
-        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-          value 
-            ? 'bg-green-100 text-green-800' 
-            : 'bg-red-100 text-red-800'
-        }`}>
-          {value ? 'Active' : 'Inactive'}
+        <span
+          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+            value ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+          }`}
+        >
+          {value ? "Active" : "Inactive"}
         </span>
-      )
+      ),
     },
     {
-      key: 'createdAt',
-      label: 'Created',
+      key: "createdAt",
+      label: "Created",
       sortable: true,
-      render: (value: string) => new Date(value).toLocaleDateString()
-    }
+      render: (value: string) => new Date(value).toLocaleDateString(),
+    },
   ];
 
   // Debug logging
-  console.log('Render state - showDepartments:', showDepartments, 'sections.length:', sections.length, 'loading:', loading);
-  
+  console.log(
+    "Render state - showDepartments:",
+    showDepartments,
+    "sections.length:",
+    sections.length,
+    "loading:",
+    loading
+  );
+
   // If showing departments (when sections don't exist)
   if (showDepartments) {
     const departmentColumns = [
       {
-        key: 'name',
-        label: 'Department Name',
-        sortable: true
+        key: "name",
+        label: "Department Name",
+        sortable: true,
       },
       {
-        key: 'doctorCount',
-        label: 'Doctors',
+        key: "doctorCount",
+        label: "Doctors",
         sortable: true,
         render: (value: number) => (
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-            {value} doctor{value !== 1 ? 's' : ''}
+            {value} doctor{value !== 1 ? "s" : ""}
           </span>
-        )
+        ),
       },
       {
-        key: 'schedules',
-        label: 'Available Days',
+        key: "schedules",
+        label: "Available Days",
         sortable: false,
         render: (value: any, row: any) => {
           const allDays = new Set();
@@ -369,11 +406,16 @@ export default function SectionsPage() {
           });
           return (
             <div className="flex flex-wrap gap-1">
-              {Array.from(allDays).slice(0, 3).map((day: any) => (
-                <span key={day} className="inline-flex items-center px-2 py-1 rounded text-xs bg-gray-100 text-gray-800">
-                  {day}
-                </span>
-              ))}
+              {Array.from(allDays)
+                .slice(0, 3)
+                .map((day: any) => (
+                  <span
+                    key={day}
+                    className="inline-flex items-center px-2 py-1 rounded text-xs bg-gray-100 text-gray-800"
+                  >
+                    {day}
+                  </span>
+                ))}
               {Array.from(allDays).length > 3 && (
                 <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-gray-100 text-gray-800">
                   +{Array.from(allDays).length - 3}
@@ -381,13 +423,13 @@ export default function SectionsPage() {
               )}
             </div>
           );
-        }
-      }
+        },
+      },
     ];
 
-    const departmentData = departmentsData.map(dept => ({
+    const departmentData = departmentsData.map((dept) => ({
       ...dept,
-      doctorCount: dept.doctors.length
+      doctorCount: dept.doctors.length,
     }));
 
     return (
@@ -418,7 +460,11 @@ export default function SectionsPage() {
                   Departments Overview
                 </h3>
                 <div className="mt-2 text-sm text-blue-700">
-                  <p>These are your existing medical departments. Click "Create Sections from Departments" to convert them into manageable sections for user assignments and doctor management.</p>
+                  <p>
+                    These are your existing medical departments. Click &quot;Create
+                    Sections from Departments&quot; to convert them into manageable
+                    sections for user assignments and doctor management.
+                  </p>
                 </div>
               </div>
             </div>
@@ -471,7 +517,7 @@ export default function SectionsPage() {
         <Modal
           isOpen={modalOpen}
           onClose={() => setModalOpen(false)}
-          title={editingSection ? 'Edit Section' : 'Add New Section'}
+          title={editingSection ? "Edit Section" : "Add New Section"}
         >
           <form onSubmit={handleSubmit} className="space-y-4">
             <FormField
@@ -490,7 +536,9 @@ export default function SectionsPage() {
               name="description"
               type="textarea"
               value={formData.description}
-              onChange={(value) => setFormData({ ...formData, description: value })}
+              onChange={(value) =>
+                setFormData({ ...formData, description: value })
+              }
               error={formErrors.description}
               placeholder="Enter section description"
             />
@@ -506,7 +554,10 @@ export default function SectionsPage() {
                   </p>
                 ) : (
                   locations.map((location) => (
-                    <div key={location._id} className="flex items-center space-x-3">
+                    <div
+                      key={location._id}
+                      className="flex items-center space-x-3"
+                    >
                       <input
                         type="checkbox"
                         id={`location-${location._id}`}
@@ -514,17 +565,27 @@ export default function SectionsPage() {
                         onChange={(e) => {
                           const newLocationIds = e.target.checked
                             ? [...formData.locationIds, location._id]
-                            : formData.locationIds.filter(id => id !== location._id);
-                          setFormData({ ...formData, locationIds: newLocationIds });
+                            : formData.locationIds.filter(
+                                (id) => id !== location._id
+                              );
+                          setFormData({
+                            ...formData,
+                            locationIds: newLocationIds,
+                          });
                         }}
                         className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                       />
-                      <label htmlFor={`location-${location._id}`} className="flex-1 cursor-pointer">
+                      <label
+                        htmlFor={`location-${location._id}`}
+                        className="flex-1 cursor-pointer"
+                      >
                         <span className="text-sm font-medium text-gray-900">
                           {location.name}
                         </span>
                         {!location.isActive && (
-                          <span className="ml-2 text-xs text-gray-500">(Inactive)</span>
+                          <span className="ml-2 text-xs text-gray-500">
+                            (Inactive)
+                          </span>
                         )}
                       </label>
                     </div>
@@ -533,7 +594,8 @@ export default function SectionsPage() {
               </div>
               {formData.locationIds.length > 0 && (
                 <p className="mt-2 text-sm text-gray-600">
-                  {formData.locationIds.length} location{formData.locationIds.length !== 1 ? 's' : ''} selected
+                  {formData.locationIds.length} location
+                  {formData.locationIds.length !== 1 ? "s" : ""} selected
                 </p>
               )}
               {formErrors.locationIds && (
@@ -546,7 +608,9 @@ export default function SectionsPage() {
               name="isActive"
               type="checkbox"
               value={formData.isActive}
-              onChange={(value) => setFormData({ ...formData, isActive: value })}
+              onChange={(value) =>
+                setFormData({ ...formData, isActive: value })
+              }
             />
 
             {/* Doctors Assignment */}
@@ -557,11 +621,16 @@ export default function SectionsPage() {
               <div className="max-h-48 overflow-y-auto border rounded-md p-3 space-y-2">
                 {getAvailableDoctors().length === 0 ? (
                   <p className="text-sm text-gray-500 text-center py-4">
-                    {editingSection ? 'No available doctors to assign' : 'No unassigned doctors available'}
+                    {editingSection
+                      ? "No available doctors to assign"
+                      : "No unassigned doctors available"}
                   </p>
                 ) : (
                   getAvailableDoctors().map((doctor) => (
-                    <div key={doctor._id} className="flex items-center space-x-3">
+                    <div
+                      key={doctor._id}
+                      className="flex items-center space-x-3"
+                    >
                       <input
                         type="checkbox"
                         id={`doctor-${doctor._id}`}
@@ -569,13 +638,16 @@ export default function SectionsPage() {
                         onChange={() => handleDoctorToggle(doctor._id)}
                         className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                       />
-                      <label htmlFor={`doctor-${doctor._id}`} className="flex-1">
+                      <label
+                        htmlFor={`doctor-${doctor._id}`}
+                        className="flex-1"
+                      >
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium text-gray-900">
                             {doctor.name}
                           </span>
                           <span className="text-xs text-gray-500">
-                            {doctor.specialization || 'No specialization'}
+                            {doctor.specialization || "No specialization"}
                           </span>
                         </div>
                         {doctor.email && (
@@ -590,7 +662,8 @@ export default function SectionsPage() {
               </div>
               {formData.doctors.length > 0 && (
                 <p className="mt-2 text-sm text-gray-600">
-                  {formData.doctors.length} doctor{formData.doctors.length !== 1 ? 's' : ''} selected
+                  {formData.doctors.length} doctor
+                  {formData.doctors.length !== 1 ? "s" : ""} selected
                 </p>
               )}
             </div>
@@ -607,7 +680,7 @@ export default function SectionsPage() {
                 type="submit"
                 className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
-                {editingSection ? 'Update' : 'Create'}
+                {editingSection ? "Update" : "Create"}
               </button>
             </div>
           </form>

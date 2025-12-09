@@ -3,38 +3,36 @@ import dbConnect from '@/utils/mongodb';
 import ActivityScheduleModel from '@/models/ActivitySchedule';
 import mongoose from 'mongoose';
 
-// GET /api/activity-schedules/[id] - Get a specific activity schedule
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+const isValidObjectId = (id: string) => mongoose.Types.ObjectId.isValid(id);
+
+// GET /api/activity-schedules/[id]
+export async function GET(req: NextRequest, context: any) {
+  const { id } = context.params;
+
   try {
     await dbConnect();
-    
-    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+
+    if (!isValidObjectId(id)) {
       return NextResponse.json(
         { success: false, error: 'Invalid activity schedule ID' },
         { status: 400 }
       );
     }
-    
-    const schedule = await ActivityScheduleModel.findById(params.id)
+
+    const schedule = await ActivityScheduleModel.findById(id)
       .populate('userId', 'username email role')
       .populate('sectionId', 'name description');
-    
+
     if (!schedule) {
       return NextResponse.json(
         { success: false, error: 'Activity schedule not found' },
         { status: 404 }
       );
     }
-    
-    return NextResponse.json({
-      success: true,
-      data: schedule
-    });
-  } catch (error) {
-    console.error('Error fetching activity schedule:', error);
+
+    return NextResponse.json({ success: true, data: schedule });
+  } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch activity schedule' },
       { status: 500 }
@@ -42,85 +40,56 @@ export async function GET(
   }
 }
 
-// PUT /api/activity-schedules/[id] - Update an activity schedule
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+// PUT /api/activity-schedules/[id]
+export async function PUT(request: NextRequest, context: any) {
+  const { id } = context.params;
+
   try {
     await dbConnect();
-    
-    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+
+    if (!isValidObjectId(id)) {
       return NextResponse.json(
         { success: false, error: 'Invalid activity schedule ID' },
         { status: 400 }
       );
     }
-    
+
     const body = await request.json();
     const { schedule, isActive, userId, sectionId } = body;
-    
-    // Check if schedule exists
-    const existingSchedule = await ActivityScheduleModel.findById(params.id);
-    if (!existingSchedule) {
+
+    const existing = await ActivityScheduleModel.findById(id);
+    if (!existing) {
       return NextResponse.json(
         { success: false, error: 'Activity schedule not found' },
         { status: 404 }
       );
     }
-    
-    // Validate schedule structure if provided
-    if (schedule && Array.isArray(schedule)) {
-      const validDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-      for (const daySchedule of schedule) {
-        if (!validDays.includes(daySchedule.day)) {
-          return NextResponse.json(
-            { success: false, error: `Invalid day: ${daySchedule.day}` },
-            { status: 400 }
-          );
-        }
-        
-        if (daySchedule.timeSlots && Array.isArray(daySchedule.timeSlots)) {
-          for (const timeSlot of daySchedule.timeSlots) {
-            if (!timeSlot.startTime || !timeSlot.endTime) {
-              return NextResponse.json(
-                { success: false, error: 'Time slots must have startTime and endTime' },
-                { status: 400 }
-              );
-            }
-          }
-        }
-      }
-    }
-    
-    const updateData: any = {};
-    if (schedule !== undefined) updateData.schedule = schedule;
-    if (isActive !== undefined) updateData.isActive = isActive;
-    
-    // Note: userId and sectionId changes would require special handling
-    // as they affect the unique constraint, so we'll prevent them here
+
     if (userId || sectionId) {
       return NextResponse.json(
-        { success: false, error: 'Cannot change user or section after creation. Create a new schedule instead.' },
+        {
+          success: false,
+          error: 'Cannot change user or section after creation. Create a new schedule instead.'
+        },
         { status: 400 }
       );
     }
-    
-    const updatedSchedule = await ActivityScheduleModel.findByIdAndUpdate(
-      params.id,
+
+    const updateData: any = {};
+    if (schedule !== undefined) updateData.schedule = schedule;
+    if (isActive !== undefined) updateData.isActive = isActive;
+
+    const updated = await ActivityScheduleModel.findByIdAndUpdate(
+      id,
       updateData,
       { new: true, runValidators: true }
-    ).populate([
-      { path: 'userId', select: 'username email role' },
-      { path: 'sectionId', select: 'name description' }
-    ]);
-    
-    return NextResponse.json({
-      success: true,
-      data: updatedSchedule
-    });
-  } catch (error) {
-    console.error('Error updating activity schedule:', error);
+    )
+      .populate('userId', 'username email role')
+      .populate('sectionId', 'name description');
+
+    return NextResponse.json({ success: true, data: updated });
+  } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { success: false, error: 'Failed to update activity schedule' },
       { status: 500 }
@@ -128,38 +97,36 @@ export async function PUT(
   }
 }
 
-// DELETE /api/activity-schedules/[id] - Delete an activity schedule
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+// DELETE /api/activity-schedules/[id]
+export async function DELETE(request: NextRequest, context: any) {
+  const { id } = context.params;
+
   try {
     await dbConnect();
-    
-    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+
+    if (!isValidObjectId(id)) {
       return NextResponse.json(
         { success: false, error: 'Invalid activity schedule ID' },
         { status: 400 }
       );
     }
-    
-    const schedule = await ActivityScheduleModel.findById(params.id);
-    
-    if (!schedule) {
+
+    const existing = await ActivityScheduleModel.findById(id);
+    if (!existing) {
       return NextResponse.json(
         { success: false, error: 'Activity schedule not found' },
         { status: 404 }
       );
     }
-    
-    await ActivityScheduleModel.findByIdAndDelete(params.id);
-    
+
+    await ActivityScheduleModel.findByIdAndDelete(id);
+
     return NextResponse.json({
       success: true,
       message: 'Activity schedule deleted successfully'
     });
-  } catch (error) {
-    console.error('Error deleting activity schedule:', error);
+  } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { success: false, error: 'Failed to delete activity schedule' },
       { status: 500 }
