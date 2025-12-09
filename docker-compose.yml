@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      MONGO_URI: mongodb://moscrm:${MONGO_PASSWORD}@localhost:27017/clinicdb?authSource=admin
+      NODE_ENV: production
+    restart: unless-stopped
+    networks:
+      - app-network
+
+networks:
+  app-network:
