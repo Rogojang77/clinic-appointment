@@ -78,8 +78,9 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Adding locationId failed:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return NextResponse.json(
-      { success: false, error: 'Failed to add locationId', details: error.message },
+      { success: false, error: 'Failed to add locationId', details: errorMessage },
       { status: 500 }
     );
   }

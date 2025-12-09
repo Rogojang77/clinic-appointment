@@ -63,11 +63,15 @@ const CalendarGrid = ({
         }, {});
 
         setColorMap(colors);
-      } catch (error: any) {
-        console.error(
-          "Error fetching colors:",
-          error?.response?.data || error.message
-        );
+      } catch (error) {
+        let errorMessage = 'Unknown error occurred';
+        if (error instanceof Error) {
+          errorMessage = error.message;
+        } else if (error && typeof error === 'object' && 'response' in error) {
+          const axiosError = error as { response?: { data?: unknown } };
+          errorMessage = axiosError.response?.data ? String(axiosError.response.data) : 'Request failed';
+        }
+        console.error("Error fetching colors:", errorMessage);
       } finally {
         setIsLoading(false);
       }

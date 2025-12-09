@@ -112,8 +112,9 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Section recreation failed:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return NextResponse.json(
-      { success: false, error: 'Failed to recreate sections', details: error.message },
+      { success: false, error: 'Failed to recreate sections', details: errorMessage },
       { status: 500 }
     );
   }

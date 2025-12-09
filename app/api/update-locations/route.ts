@@ -92,8 +92,9 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Location update failed:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return NextResponse.json(
-      { success: false, error: 'Failed to update locations', details: error.message },
+      { success: false, error: 'Failed to update locations', details: errorMessage },
       { status: 500 }
     );
   }

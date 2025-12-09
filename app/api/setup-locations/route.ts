@@ -90,8 +90,9 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Location setup failed:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return NextResponse.json(
-      { success: false, error: 'Failed to setup locations', details: error.message },
+      { success: false, error: 'Failed to setup locations', details: errorMessage },
       { status: 500 }
     );
   }
