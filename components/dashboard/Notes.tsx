@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import dayjs from "dayjs";
 import toast from "react-hot-toast";
@@ -14,7 +14,7 @@ const Notes: React.FC<NotesProps> = ({ selectedDate, location,textareaContent,se
   const [isLoading, setIsLoading] = useState(false);
   const [noteId, setNoteId] = useState<string | null>(null);
 
-  const fetchNotes = async (date: string, location: string) => {
+  const fetchNotes = useCallback(async (date: string, location: string) => {
     try {
       setIsLoading(true);
       const response = await axios.get(`/api/notes`, {
@@ -35,13 +35,13 @@ const Notes: React.FC<NotesProps> = ({ selectedDate, location,textareaContent,se
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [setTextareaContent]);
 
   useEffect(() => {
     if (selectedDate && location) {
       fetchNotes(selectedDate.format("YYYY-MM-DD"), location);
     }
-  }, [selectedDate, location]);
+  }, [selectedDate, location, fetchNotes]);
 
   const handleAddOrUpdateNotes = async () => {
     if (!textareaContent.trim()) {

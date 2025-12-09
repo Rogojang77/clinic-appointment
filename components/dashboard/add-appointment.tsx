@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Formik, Form, Field, FormikHelpers, FormikErrors } from "formik";
 import * as Yup from "yup";
 import { Button } from "@/components/ui/button";
@@ -222,7 +222,7 @@ export default function AppointmentAddEdit({
   };
 
   // get the time slots ...
-  const fetchTimeSlots = async () => {
+  const fetchTimeSlots = useCallback(async () => {
     if (location && day) {
       const slots = await fetchTimeSlotsAPI(
         location,
@@ -234,7 +234,7 @@ export default function AppointmentAddEdit({
       console.warn("Location or selectDay is missing.");
       setTimeSlots([]);
     }
-  };
+  }, [location, day, date, setTimeSlots]);
 
   // Add new time slots according to Location , Day and Date Wise .....
   const handleAddTime = async () => {
@@ -267,7 +267,7 @@ export default function AppointmentAddEdit({
     if (location && day) {
       fetchTimeSlots();
     }
-  }, [location, day, date]);
+  }, [location, day, date, fetchTimeSlots]);
 
   useEffect(() => {
     fetchSections();

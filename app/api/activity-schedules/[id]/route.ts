@@ -6,19 +6,20 @@ import mongoose from 'mongoose';
 // GET /api/activity-schedules/[id] - Get a specific activity schedule
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
+    const { id } = await params;
     
-    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
         { success: false, error: 'Invalid activity schedule ID' },
         { status: 400 }
       );
     }
     
-    const schedule = await ActivityScheduleModel.findById(params.id)
+    const schedule = await ActivityScheduleModel.findById(id)
       .populate('userId', 'username email role')
       .populate('sectionId', 'name description');
     
@@ -45,12 +46,13 @@ export async function GET(
 // PUT /api/activity-schedules/[id] - Update an activity schedule
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
+    const { id } = await params;
     
-    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
         { success: false, error: 'Invalid activity schedule ID' },
         { status: 400 }
@@ -61,7 +63,7 @@ export async function PUT(
     const { schedule, isActive, userId, sectionId } = body;
     
     // Check if schedule exists
-    const existingSchedule = await ActivityScheduleModel.findById(params.id);
+    const existingSchedule = await ActivityScheduleModel.findById(id);
     if (!existingSchedule) {
       return NextResponse.json(
         { success: false, error: 'Activity schedule not found' },
@@ -107,7 +109,7 @@ export async function PUT(
     }
     
     const updatedSchedule = await ActivityScheduleModel.findByIdAndUpdate(
-      params.id,
+      id,
       updateData,
       { new: true, runValidators: true }
     ).populate([
@@ -131,19 +133,20 @@ export async function PUT(
 // DELETE /api/activity-schedules/[id] - Delete an activity schedule
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
+    const { id } = await params;
     
-    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
         { success: false, error: 'Invalid activity schedule ID' },
         { status: 400 }
       );
     }
     
-    const schedule = await ActivityScheduleModel.findById(params.id);
+    const schedule = await ActivityScheduleModel.findById(id);
     
     if (!schedule) {
       return NextResponse.json(
@@ -152,7 +155,7 @@ export async function DELETE(
       );
     }
     
-    await ActivityScheduleModel.findByIdAndDelete(params.id);
+    await ActivityScheduleModel.findByIdAndDelete(id);
     
     return NextResponse.json({
       success: true,

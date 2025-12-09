@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 
 import TableComponent from "../common/table-component";
 import CalendarGrid from "./calender-grid";
@@ -39,7 +39,7 @@ const Dashboard = () => {
     selectedDate?.format("dddd") && dayNameMap[selectedDate?.format("dddd")];
 
   // Get The Appointments by API Calling ....
-  const fetchAppointments = async () => {
+  const fetchAppointments = useCallback(async () => {
     try {
       setIsLoading(true);
       const filters = {
@@ -56,10 +56,10 @@ const Dashboard = () => {
       console.error("Error fetching appointments:", error);
       setIsLoading(false);
     }
-  };
+  }, [selectedDate, location, selectedTestType]);
 
   // Fetch sections from database based on selected location
-  const fetchSections = async () => {
+  const fetchSections = useCallback(async () => {
     if (!location || locations.length === 0) {
       console.log("Cannot fetch sections: location or locations not ready", { location, locationsCount: locations.length });
       return;
@@ -112,10 +112,10 @@ const Dashboard = () => {
       // Fallback to static data if API fails
       setSections(departmentsData);
     }
-  };
+  }, [location, locations]);
 
   // Fetch locations from database
-  const fetchLocations = async () => {
+  const fetchLocations = useCallback(async () => {
     try {
       const response = await locationsApi.getAll();
       const loadedLocations = response.data.data || [];
@@ -218,17 +218,17 @@ const Dashboard = () => {
         }
       }
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (location) {
       fetchAppointments();
     }
-  }, [selectedDate, location, selectedTestType]);
+  }, [selectedDate, location, selectedTestType, fetchAppointments]);
 
   useEffect(() => {
     fetchLocations();
-  }, []);
+  }, [fetchLocations]);
 
   // Fetch sections when location changes and locations are loaded
   useEffect(() => {
@@ -239,10 +239,10 @@ const Dashboard = () => {
       // Don't clear sections if locations are still loading
       console.log("useEffect: Locations not loaded yet");
     }
-  }, [location, locations]);
+  }, [location, locations, fetchSections]);
 
   // According to Location and Day Name Get the timeSlots....
-  const fetchTimeSlots = async () => {
+  const fetchTimeSlots = useCallback(async () => {
     if (location && selectDay) {
       const slots = await fetchTimeSlotsAPI(location, selectDay,selectedDate?.format("YYYY-MM-DD"));
       setTimeSlots(slots);
@@ -250,14 +250,14 @@ const Dashboard = () => {
       console.warn("Location or selectDay is missing.");
       setTimeSlots([]);
     }
-  };
+  }, [location, selectDay, selectedDate, setTimeSlots]);
 
   // For EcoTable Fetch The Time Slot Initiallly when select Ecografie Tab ...
   useEffect(() => {
     if (selectedTestType === "Ecografie" && selectedDate) {
       fetchTimeSlots();
     }
-  }, [location, selectDay, selectedTestType, selectedDate, data]);
+  }, [location, selectDay, selectedTestType, selectedDate, data, fetchTimeSlots]);
 
 
   // Handle The Tab Selection ...
