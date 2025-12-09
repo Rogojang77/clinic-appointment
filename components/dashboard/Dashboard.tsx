@@ -16,7 +16,7 @@ import { fetchAppointmentsAPI } from "@/service/appointmentService";
 import { handleDownloadPDF, TestTypeSelectedRefresh } from "@/service/actionService";
 import { fetchTimeSlotsAPI } from "@/service/scheduleService";
 import AddAppointmentButton from "./AddButton";
-import { sectionsApi, locationsApi } from "@/services/api";
+import { sectionsApi, locationsApi, Section, Location } from "@/services/api";
 
 const Dashboard = () => {
   const [location, setLocation] = useState<string>("");
@@ -28,8 +28,8 @@ const Dashboard = () => {
   const [textareaContent, setTextareaContent] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [sections, setSections] = useState([]);
-  const [locations, setLocations] = useState([]);
+  const [sections, setSections] = useState<Section[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   
   const { setTimeSlots, timeSlots } = useTimeSlotStore();
 
@@ -109,8 +109,8 @@ const Dashboard = () => {
       setSections(sectionsData);
     } catch (error) {
       console.error("Error fetching sections:", error);
-      // Fallback to static data if API fails
-      setSections(departmentsData);
+      // Fallback to empty array if API fails
+      setSections([]);
     }
   }, [location, locations]);
 
@@ -164,7 +164,7 @@ const Dashboard = () => {
             setSections(sectionsData);
           } catch (sectionsError) {
             console.error("Error fetching sections:", sectionsError);
-            setSections(departmentsData);
+            setSections([]);
           }
         }
       }
@@ -213,7 +213,7 @@ const Dashboard = () => {
             setSections(sectionsData);
           } catch (sectionsError) {
             console.error("Error fetching sections:", sectionsError);
-            setSections(departmentsData);
+            setSections([]);
           }
         }
       }

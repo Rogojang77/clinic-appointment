@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
         
         if (sectionObj.doctors && sectionObj.doctors.length > 0) {
           // Convert string IDs back to ObjectIds for the query
-          const doctorIds = sectionObj.doctors.map(id => typeof id === 'string' ? id : id.toString());
+          const doctorIds = sectionObj.doctors.map((id: any) => typeof id === 'string' ? id : id.toString());
           
           const doctors = await DoctorModel.find({ _id: { $in: doctorIds } })
             .select('name email specialization isActive');
@@ -90,7 +90,9 @@ export async function GET(request: NextRequest) {
       });
     } catch (populateError) {
       console.error('Could not populate doctors manually:', populateError);
-      console.error('Populate error details:', populateError.message);
+      if (populateError && typeof populateError === 'object' && 'message' in populateError) {
+        console.error('Populate error details:', populateError.message);
+      }
       // Continue without populated doctors
     }
     

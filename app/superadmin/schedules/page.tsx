@@ -200,10 +200,10 @@ export default function SchedulesPage() {
     }
   };
 
-  const updateTimeSlot = (dayIndex: number, slotIndex: number, field: keyof TimeSlot, value: any) => {
+  const updateTimeSlot = (dayIndex: number, slotIndex: number, field: keyof TimeSlot, value: string | boolean) => {
     const newSchedule = [...formData.schedule];
     if (newSchedule[dayIndex] && newSchedule[dayIndex].timeSlots[slotIndex]) {
-      newSchedule[dayIndex].timeSlots[slotIndex][field] = value;
+      (newSchedule[dayIndex].timeSlots[slotIndex] as any)[field] = value;
       setFormData({ ...formData, schedule: newSchedule });
     }
   };

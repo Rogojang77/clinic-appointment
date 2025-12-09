@@ -20,7 +20,7 @@ import dayjs from "dayjs";
 import { useTimeSlotStore } from "@/store/timeStore";
 import { Switch } from "@/components/ui/switch";
 import { fetchTimeSlotsAPI } from "@/service/scheduleService";
-import { sectionsApi, doctorsApi, locationsApi } from "@/services/api";
+import { sectionsApi, doctorsApi, locationsApi, Section, Doctor, Location } from "@/services/api";
 
 dayjs.extend(utc);
 
@@ -89,9 +89,9 @@ export default function AppointmentAddEdit({
   const [showTimeSelector, setShowTimeSelector] = useState(false);
   const [selectedDepartment, setSelectedDepartment] = useState("");
   const [selectedSection, setSelectedSection] = useState("");
-  const [sections, setSections] = useState([]);
-  const [doctors, setDoctors] = useState([]);
-  const [locations, setLocations] = useState([]);
+  const [sections, setSections] = useState<Section[]>([]);
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const { timeSlots, setTimeSlots } = useTimeSlotStore();
 
   const appointmentDate = dayjs(date).startOf("day");
@@ -194,7 +194,7 @@ export default function AppointmentAddEdit({
 
   const fetchDoctors = async (sectionId?: string) => {
     try {
-      const params = { isActive: true };
+      const params: { isActive: boolean; sectionId?: string } = { isActive: true };
       if (sectionId) {
         params.sectionId = sectionId;
       }

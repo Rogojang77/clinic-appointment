@@ -87,9 +87,9 @@ export async function PUT(
       success: true,
       data: updatedLocation
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error updating location:', error);
-    if (error.code === 11000) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 11000) {
       return NextResponse.json(
         { success: false, error: 'Location with this name already exists' },
         { status: 400 }

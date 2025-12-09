@@ -29,7 +29,7 @@ const AppointmentSchema: Schema = new Schema({
   timestamps: true
 });
 
-export interface IAppointment extends Appointment, Document {}
+export interface IAppointment extends Omit<Appointment, '_id'>, Document {}
 
 const AppointModel = mongoose.models.Appointment || mongoose.model<IAppointment>('Appointment', AppointmentSchema); 
 

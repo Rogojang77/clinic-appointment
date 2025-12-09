@@ -28,6 +28,9 @@ export interface Section {
   name: string;
   description?: string;
   isActive: boolean;
+  locationIds?: string[] | Array<{ _id: string; name: string; isActive: boolean }>;
+  locationId?: string | { _id: string; name: string; isActive: boolean };
+  doctors?: any[];
   createdAt: string;
   updatedAt: string;
 }
@@ -75,7 +78,7 @@ export interface Doctor {
   email?: string;
   phone?: string;
   specialization?: string;
-  sectionId: string;
+  sectionId: string | { _id: string; name: string; description?: string };
   schedule: DailySchedule[];
   isActive: boolean;
   createdAt: string;

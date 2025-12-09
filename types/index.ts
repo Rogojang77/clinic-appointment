@@ -59,14 +59,14 @@ export type Schedule = {
   endTime: string;
 };
 
-export type Doctor = {
+export type DoctorSchedule = {
   name: string;
   schedule: Schedule[];
 };
 
 export type Department = {
   name: string;
-  doctors: Doctor[];
+  doctors: DoctorSchedule[];
 };
 
 // Section interface

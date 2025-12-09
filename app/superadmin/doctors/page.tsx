@@ -104,12 +104,15 @@ export default function DoctorsPage() {
 
   const handleEdit = (doctor: Doctor) => {
     setEditingDoctor(doctor);
+    const sectionIdValue = typeof doctor.sectionId === 'string' 
+      ? doctor.sectionId 
+      : doctor.sectionId?._id || '';
     setFormData({
       name: doctor.name,
       email: doctor.email || '',
       phone: doctor.phone || '',
       specialization: doctor.specialization || '',
-      sectionId: doctor.sectionId,
+      sectionId: sectionIdValue,
       isActive: doctor.isActive,
       schedule: doctor.schedule
     });
@@ -403,7 +406,7 @@ export default function DoctorsPage() {
 
                     {formData.schedule[dayIndex]?.isWorkingDay && (
                       <div className="space-y-2">
-                        {formData.schedule[dayIndex].timeSlots.map((slot, slotIndex) => (
+                        {formData.schedule[dayIndex].timeSlots.map((slot: any, slotIndex: number) => (
                           <div key={slotIndex} className="flex items-center space-x-2">
                             <input
                               type="time"
