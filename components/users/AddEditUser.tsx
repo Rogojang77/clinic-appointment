@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from 'next/navigation'; // App Router
-import axios from "axios";
+import api from "@/services/api";
 import { toast } from "react-hot-toast";
 import { useFormik, FormikHelpers } from "formik";
 import * as Yup from "yup";
@@ -38,7 +38,7 @@ const UserForm: React.FC = () => {
   const onSubmit = async (values: FormValues, { resetForm }: FormikHelpers<FormValues>) => {
     try {
       setIsLoading(true);
-      const response = await axios.post("/api/register", values);
+      const response = await api.post("/register", values);
 
       if (response.status === 201) {
         toast.success("User registered successfully!");

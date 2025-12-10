@@ -9,8 +9,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"; // Adjust the import path based on your structure
 import { Button } from "@/components/ui/button"; // Adjust the import path
-import axios from "axios";
 import toast from "react-hot-toast";
+import api from "@/services/api";
 import isDateValid from "@/utils/isValidDate";
 
 interface Appointment {
@@ -81,7 +81,7 @@ const TableComponent: React.FC<TableComponentProps> = ({
     if (appointmentToDelete) {
       try {
         setIsDeleting(true);
-        await axios.delete(`/api/appointments?id=${appointmentToDelete?._id}`);
+        await api.delete(`/appointments?id=${appointmentToDelete?._id}`);
         toast.success("Programarea a fost ștearsă cu succes!");
         fetchData();
       } catch (err) {

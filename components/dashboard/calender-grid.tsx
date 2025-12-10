@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import dayjs from "dayjs";
 import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
 import { getCalendarDays } from "@/utils/getCalenderDays";
-import axios from "axios";
 import Spinner from "../common/loader";
+import api from "@/services/api";
 
 dayjs.extend(isSameOrBefore);
 
@@ -57,12 +57,8 @@ const CalendarGrid = ({
     const fetchColors = async () => {
       setIsLoading(true);
       try {
-        const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-        const headers = token ? { Authorization: `Bearer ${token}` } : {};
-        
-        const response = await axios.get("/api/colors", {
+        const response = await api.get("/colors", {
           params: { startDate, endDate, location },
-          headers,
         });
 
         const data = Array.isArray(response.data?.data)

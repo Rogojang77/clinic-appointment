@@ -13,7 +13,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { departmentsData, locations } from "@/lib/department";
-import axios from "axios";
 import toast from "react-hot-toast";
 import utc from "dayjs/plugin/utc";
 import dayjs from "dayjs";
@@ -21,6 +20,7 @@ import { useTimeSlotStore } from "@/store/timeStore";
 import { Switch } from "@/components/ui/switch";
 import { fetchTimeSlotsAPI } from "@/service/scheduleService";
 import { sectionsApi, doctorsApi, locationsApi, Section, Doctor, Location } from "@/services/api";
+import api from "@/services/api";
 
 dayjs.extend(utc);
 
@@ -136,19 +136,14 @@ export default function AppointmentAddEdit({
 
   const createAppointment = async (values: Appointment, formattedDate: any) => {
     try {
-      const response = await axios.post(
-        "/api/appointments",
+      const response = await api.post(
+        "/appointments",
         {
           ...values,
           day: day,
           date: formattedDate,
           sectionId: values.sectionId || undefined,
           doctorId: values.doctorId || undefined,
-        },
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
         }
       );
 
@@ -166,14 +161,9 @@ export default function AppointmentAddEdit({
     updatedData: any
   ) => {
     try {
-      const response = await axios.patch(
-        `/api/appointments?id=${appointmentId}`,
-        updatedData,
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
+      const response = await api.patch(
+        `/appointments?id=${appointmentId}`,
+        updatedData
       );
     } catch (error) {
       console.error("Error updating appointment:", error);
@@ -238,17 +228,12 @@ export default function AppointmentAddEdit({
   // Add new time slots according to Location , Day and Date Wise .....
   const handleAddTime = async () => {
     try {
-      const response = await axios.post(
-        "/api/schedule",
+      const response = await api.post(
+        "/schedule",
         {
           location,
           day,
           timeSlot: { time: customTime, date: formattedDate },
-        },
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
         }
       );
       if (response.status === 201) {

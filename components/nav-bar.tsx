@@ -2,11 +2,11 @@
 "use client";
 import Link from "next/link";
 import Image from "next/image";
-import axios from "axios";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { useUserStore } from "@/store/store";
 import { removeToken } from "@/utils/tokenStorage";
+import api from "@/services/api";
 
 export default function Navbar() {
   const router = useRouter();
@@ -15,7 +15,7 @@ export default function Navbar() {
 
   const handleLogout = async () => {
     try {
-      const res = await axios.get("/api/logout");
+      const res = await api.get("/logout");
       removeToken(); // Remove token from localStorage
       clearUser();
       toast.success(res.data.message);

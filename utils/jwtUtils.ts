@@ -28,6 +28,8 @@ export async function verifyJWT(token: string): Promise<JWTPayload | null> {
     const { payload } = await jwtVerify(token, secret);
     
     // Type guard to ensure payload has required fields
+    // Cast to Record<string, any> to safely access properties
+    const payloadRecord = payload as Record<string, any>;
     if (
       payload &&
       typeof payload === 'object' &&
@@ -36,7 +38,16 @@ export async function verifyJWT(token: string): Promise<JWTPayload | null> {
       'username' in payload &&
       'role' in payload
     ) {
-      return payload as JWTPayload;
+      // Convert jose JWTPayload to our custom JWTPayload type
+      return {
+        id: String(payloadRecord.id),
+        email: String(payloadRecord.email),
+        username: String(payloadRecord.username),
+        role: String(payloadRecord.role),
+        isAdmin: Boolean(payloadRecord.isAdmin),
+        iat: typeof payloadRecord.iat === 'number' ? payloadRecord.iat : undefined,
+        exp: typeof payloadRecord.exp === 'number' ? payloadRecord.exp : undefined,
+      } as JWTPayload;
     }
     
     return null;

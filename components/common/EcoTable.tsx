@@ -7,8 +7,8 @@ import {
   DialogTitle,
 } from "../ui/dialog";
 import { Button } from "./button";
-import axios from "axios";
 import toast from "react-hot-toast";
+import api from "@/services/api";
 import { useState } from "react";
 import isDateValid from "@/utils/isValidDate";
 import { Switch } from "../ui/switch";
@@ -80,7 +80,7 @@ const EcoTable: React.FC<TableComponentProps> = ({
     if (appointmentToDelete) {
       try {
         setIsDeleting(true);
-        await axios.delete(`/api/appointments?id=${appointmentToDelete._id}`);
+        await api.delete(`/appointments?id=${appointmentToDelete._id}`);
         toast.success("Programarea a fost ștearsă cu succes!");
         fetchData();
       } catch (err) {
@@ -97,7 +97,7 @@ const EcoTable: React.FC<TableComponentProps> = ({
   const handleToggleConfirmed = async (appointmentId: string, isConfirmed: boolean) => {
     try {
       setUpdatingAppointmentId(appointmentId);
-      await axios.patch(`/api/appointments?id=${appointmentId}`, { isConfirmed });
+      await api.patch(`/appointments?id=${appointmentId}`, { isConfirmed });
   
       toast.success("Statusul programării a fost actualizat!");
       fetchData(); // Refresh data after update

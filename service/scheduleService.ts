@@ -1,15 +1,10 @@
-import axios from "axios";
+import api from "@/services/api";
 
 // Utility function to fetch time slots by location, day, and optional date
 export async function getTimeSlotsByLocationAndDay(filters:any) {
   try {
-    // Get token from localStorage and add to headers
-    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-    const headers = token ? { Authorization: `Bearer ${token}` } : {};
-    
-    const response = await axios.get("/api/schedule", {
+    const response = await api.get("/schedule", {
       params: filters,
-      headers,
     });
 
     if (response.data) {

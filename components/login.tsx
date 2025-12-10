@@ -2,7 +2,7 @@
 import { Formik, Form, Field, ErrorMessage } from "formik";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import axios from "axios";
+import api from "@/services/api";
 import * as Yup from "yup";
 import { useState } from "react";
 import toast from "react-hot-toast";
@@ -29,7 +29,7 @@ const SignIn = () => {
   const handleSubmit = async (values: any) => {
     try {
       setIsLoading(true);
-      const response = await axios.post("/api/login", values);
+      const response = await api.post("/login", values);
       if (response.status === 200) {
         const { user, token } = response.data;
         setUser(user);

@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react";
-import axios from "axios";
 import dayjs from "dayjs";
 import toast from "react-hot-toast";
 import { Loader } from "lucide-react";
 import Spinner from "../common/loader";
+import api from "@/services/api";
 
 interface NotesProps {
   selectedDate: dayjs.Dayjs | null;
@@ -19,12 +19,9 @@ const Notes: React.FC<NotesProps> = ({ selectedDate, location,textareaContent,se
   const fetchNotes = useCallback(async (date: string, location: string) => {
     try {
       setIsLoading(true);
-      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
       
-      const response = await axios.get(`/api/notes`, {
+      const response = await api.get(`/notes`, {
         params: { date, location },
-        headers,
       });
 
       if (response.data?.success && response?.data?.data?.length > 0) {
@@ -56,28 +53,23 @@ const Notes: React.FC<NotesProps> = ({ selectedDate, location,textareaContent,se
 
     try {
       setIsLoading(true);
-
-      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
       
       if (noteId) {
         // Update existing note
-        await axios.patch(
-          `/api/notes?id=${noteId}`,
-          { notes: textareaContent },
-          { headers }
+        await api.patch(
+          `/notes?id=${noteId}`,
+          { notes: textareaContent }
         );
         toast.success("Notes updated successfully.");
       } else {
         // Add new note
-        const response = await axios.post(
-          `/api/notes`,
+        const response = await api.post(
+          `/notes`,
           {
             date: selectedDate?.format("YYYY-MM-DD"),
             location:location,
             notes: textareaContent,
-          },
-          { headers }
+          }
         );
         setNoteId(response.data.data._id);
         toast.success("Notes created successfully.");
