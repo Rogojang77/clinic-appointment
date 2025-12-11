@@ -1,9 +1,15 @@
 import dbConnect from "@/utils/mongodb";
 import LocationScheduleModel from "@/models/LocationSchedule";
-import SectionScheduleModel, { ISectionSchedule, ISchedule } from "@/models/SectionSchedule";
+import SectionScheduleModel, { ISchedule } from "@/models/SectionSchedule";
+
+interface ScheduleItem {
+  date: string;
+  time: string;
+  _id: string;
+}
 
 interface Schedule {
-  [day: string]: { date: string; time: string; _id: string }[];
+  [day: string]: ScheduleItem[];
 }
 
 interface LocationSchedule {
@@ -11,7 +17,6 @@ interface LocationSchedule {
   schedule: Schedule;
 }
 
-// Type for lean SectionSchedule (plain object from .lean())
 type SectionScheduleLean = {
   _id: string;
   sectionId: string | { toString(): string };
@@ -23,7 +28,9 @@ type SectionScheduleLean = {
 };
 
 /**
- * Count default time slots with priority: Section Schedule > Location Schedule
+ * Count default time slots with priority:
+ * 1. Section Schedule
+ * 2. Location Schedule
  */
 export default async function countDefaultTimeSlots(
   location: string,
@@ -33,60 +40,64 @@ export default async function countDefaultTimeSlots(
   await dbConnect();
 
   try {
-    // Default date to count
     const defaultDate = "00:00:00";
 
-    // Priority 1: Check section schedule if sectionId is provided
-    if (sectionId) {
-      const sectionSchedule = await SectionScheduleModel.findOne({
-        sectionId,
-        location,
-        [`schedule.${day}`]: {
-          $elemMatch: {
-            date: defaultDate,
-          },
-        },
-      }).lean<SectionScheduleLean | null>();
+    // Convert dynamic string key to a schedule key (safe for TypeScript strict mode)
+    const dayKey = day as keyof ISchedule;
 
-      if (sectionSchedule && sectionSchedule.schedule[day]) {
-        const daySchedule = sectionSchedule.schedule[day];
+    // --------------------------------------------------------
+    // Priority 1: Section Schedule
+    // --------------------------------------------------------
+    if (sectionId) {
+      const sectionSchedule = await SectionScheduleModel.findOne(
+        {
+          sectionId,
+          location,
+          [`schedule.${day}`]: { $elemMatch: { date: defaultDate } }
+        }
+      ).lean<SectionScheduleLean | null>();
+
+      if (sectionSchedule && sectionSchedule.schedule[dayKey]) {
+        const daySchedule = sectionSchedule.schedule[dayKey];
+
         const defaultDateSlots = daySchedule.filter(
           (item: any) => item.date === defaultDate
         );
+
         if (defaultDateSlots.length > 0) {
           return defaultDateSlots.length;
         }
       }
     }
 
-    // Priority 2: Fall back to location schedule
-    const filter = {
-      location,
-      [`schedule.${day}`]: {
-        $elemMatch: {
-          date: defaultDate,
-        },
+    // --------------------------------------------------------
+    // Priority 2: Location Schedule
+    // --------------------------------------------------------
+    const scheduleDoc = await LocationScheduleModel.findOne(
+      {
+        location,
+        [`schedule.${day}`]: { $elemMatch: { date: defaultDate } }
       },
-    };
+      {
+        [`schedule.${day}`]: 1
+      }
+    ).lean<LocationSchedule | null>();
 
-    const scheduleDocument = await LocationScheduleModel.findOne(filter, {
-      [`schedule.${day}`]: 1,
-    }).lean<LocationSchedule | null>();
+    // For LocationSchedule the interface is dynamic, so use Runtime Schedule type
+    const locDayKey = day as keyof Schedule;
 
-    if (!scheduleDocument || !scheduleDocument.schedule[day]) {
-      return 0; // Return 0 if no schedules are found
+    if (!scheduleDoc || !scheduleDoc.schedule[locDayKey]) {
+      return 0;
     }
 
-    // Filter schedules by the default date
-    const daySchedule = scheduleDocument.schedule[day];
+    const daySchedule = scheduleDoc.schedule[locDayKey];
     const defaultDateSlots = daySchedule.filter(
       (item) => item.date === defaultDate
     );
 
-    // Return the count of default date time slots
     return defaultDateSlots.length;
   } catch (error) {
     console.error("Error counting default date time slots:", error);
-    throw error; // Re-throw the error to handle it in the calling function
+    throw error;
   }
 }
