@@ -1,6 +1,6 @@
 import dbConnect from "@/utils/mongodb";
 import LocationScheduleModel from "@/models/LocationSchedule";
-import SectionScheduleModel from "@/models/SectionSchedule";
+import SectionScheduleModel, { ISectionSchedule, ISchedule } from "@/models/SectionSchedule";
 
 interface Schedule {
   [day: string]: { date: string; time: string; _id: string }[];
@@ -10,6 +10,17 @@ interface LocationSchedule {
   location: string;
   schedule: Schedule;
 }
+
+// Type for lean SectionSchedule (plain object from .lean())
+type SectionScheduleLean = {
+  _id: string;
+  sectionId: string | { toString(): string };
+  location: string;
+  schedule: ISchedule;
+  slotInterval?: number;
+  createdAt?: Date;
+  updatedAt?: Date;
+};
 
 /**
  * Count default time slots with priority: Section Schedule > Location Schedule
@@ -35,7 +46,7 @@ export default async function countDefaultTimeSlots(
             date: defaultDate,
           },
         },
-      }).lean();
+      }).lean<SectionScheduleLean | null>();
 
       if (sectionSchedule && sectionSchedule.schedule[day]) {
         const daySchedule = sectionSchedule.schedule[day];
