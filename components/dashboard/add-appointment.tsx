@@ -200,8 +200,10 @@ interface Appointment {
   phoneNumber: string;
   isConfirmed: boolean;
   notes: string;
-  sectionId?: string;
-  doctorId?: string;
+  sectionId?: string | { _id: string; name: string; description?: string };
+  doctorId?: string | { _id: string; name: string; specialization?: string };
+  section?: { _id: string; name: string; description?: string };
+  doctor?: { _id: string; name: string; specialization?: string };
 }
 
 // Validation schema using Yup
@@ -489,8 +491,14 @@ export default function AppointmentAddEdit({
 
   // Initialize selectedSection from existing appointment data when editing
   useEffect(() => {
-    if (data?.sectionId && data.sectionId !== selectedSection) {
-      setSelectedSection(data.sectionId);
+    if (data?.sectionId) {
+      // Handle both string and populated object types
+      const sectionIdValue = typeof data.sectionId === 'string' 
+        ? data.sectionId 
+        : data.sectionId._id;
+      if (sectionIdValue && sectionIdValue !== selectedSection) {
+        setSelectedSection(sectionIdValue);
+      }
     } else if (!data && selectedSection && isModalOpen) {
       // Reset when creating new appointment (only when modal opens)
       setSelectedSection("");

@@ -20,11 +20,12 @@ export interface Appointment {
   isConfirmed: boolean;
   isDefault?: boolean;
   notes: string;
-  // New relationship fields
-  sectionId?: string;
-  doctorId?: string;
-  section?: Section; // Populated section data
-  doctor?: Doctor; // Populated doctor data
+  // New relationship fields - support both string IDs and populated objects
+  sectionId?: string | { _id: string; name: string; description?: string };
+  doctorId?: string | { _id: string; name: string; specialization?: string };
+  // Populated fields from backend
+  section?: Section | { _id: string; name: string; description?: string };
+  doctor?: Doctor | { _id: string; name: string; specialization?: string };
   createdAt?: Date;
   updatedAt?: Date;
 }
