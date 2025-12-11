@@ -20,7 +20,18 @@ export async function GET(
       );
     }
     
-    const doctor = await DoctorModel.findById(id);
+    const doctor = await DoctorModel.findById(id)
+      .populate({
+        path: 'locationIds',
+        select: 'name isActive',
+        strictPopulate: false
+      })
+      .populate({
+        path: 'locationId',
+        select: 'name isActive',
+        strictPopulate: false
+      })
+      .populate('sectionId', 'name description');
     
     if (!doctor) {
       return NextResponse.json(
@@ -29,7 +40,7 @@ export async function GET(
       );
     }
     
-    // Convert to plain object and handle populated sectionId
+    // Convert to plain object and handle populated fields
     const doctorObj = doctor.toObject();
     // If sectionId is populated, use it as the section
     if (doctorObj.sectionId && typeof doctorObj.sectionId === 'object') {
@@ -72,6 +83,8 @@ export async function PUT(
       email, 
       phone, 
       specialization, 
+      locationIds,
+      locationId, // Legacy support
       sectionId, 
       schedule, 
       isActive 
@@ -144,6 +157,34 @@ export async function PUT(
     }
     
     const updateData: any = {};
+    
+    // Handle locationIds (array) or locationId (single) for backward compatibility
+    if (locationIds !== undefined || locationId !== undefined) {
+      const finalLocationIds = locationIds && Array.isArray(locationIds) && locationIds.length > 0
+        ? locationIds
+        : locationId 
+          ? [locationId]
+          : [];
+      
+      if (finalLocationIds.length === 0) {
+        return NextResponse.json(
+          { success: false, error: 'At least one location is required' },
+          { status: 400 }
+        );
+      }
+      
+      // Validate location IDs
+      for (const locId of finalLocationIds) {
+        if (!mongoose.Types.ObjectId.isValid(locId)) {
+          return NextResponse.json(
+            { success: false, error: 'Invalid location ID' },
+            { status: 400 }
+          );
+        }
+      }
+      
+      updateData.locationIds = finalLocationIds;
+    }
     if (name !== undefined) updateData.name = name;
     if (email !== undefined) updateData.email = email;
     if (phone !== undefined) updateData.phone = phone;
@@ -172,7 +213,18 @@ export async function PUT(
       id,
       updateData,
       { new: true, runValidators: true }
-    ).populate('sectionId', 'name description');
+    )
+      .populate({
+        path: 'locationIds',
+        select: 'name isActive',
+        strictPopulate: false
+      })
+      .populate({
+        path: 'locationId',
+        select: 'name isActive',
+        strictPopulate: false
+      })
+      .populate('sectionId', 'name description');
     
     return NextResponse.json({
       success: true,

@@ -9,7 +9,6 @@ import {
   LayoutDashboard,
   Users,
   Building2,
-  Calendar,
   UserCheck,
   LogOut,
   Menu,
@@ -85,12 +84,6 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
       href: '/superadmin/users',
       icon: Users,
       current: pathname.startsWith('/superadmin/users')
-    },
-    {
-      name: 'Activity Schedules',
-      href: '/superadmin/schedules',
-      icon: Calendar,
-      current: pathname.startsWith('/superadmin/schedules')
     }
   ];
 

@@ -1,10 +1,10 @@
 'use client';
 
 import { departmentsData } from '@/lib/department';
-import React, { useState } from 'react';
+import { useState, ChangeEvent } from 'react';
 
 
-const DepartmentList: React.FC = () => {
+const DepartmentList = () => {
   const [selectedDepartment, setSelectedDepartment] = useState<string>('');
 
   // Filter departments based on the selection
@@ -12,7 +12,7 @@ const DepartmentList: React.FC = () => {
     ? departmentsData.filter((dep) => dep.name === selectedDepartment)
     : departmentsData;
 
-  const handleDepartmentChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleDepartmentChange = (event: ChangeEvent<HTMLSelectElement>) => {
     setSelectedDepartment(event.target.value);
   };
 

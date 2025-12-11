@@ -20,7 +20,8 @@ export interface IDoctor extends Document {
   email?: string;
   phone?: string;
   specialization?: string;
-  locationId: mongoose.Types.ObjectId; // Reference to Location
+  locationIds: mongoose.Types.ObjectId[]; // References to Locations (multiple)
+  locationId?: mongoose.Types.ObjectId; // Legacy field for backward compatibility
   sectionId: mongoose.Types.ObjectId;
   schedule: IDailySchedule[];
   isActive: boolean;
@@ -82,10 +83,15 @@ const DoctorSchema = new Schema<IDoctor>(
       type: String, 
       trim: true 
     },
+    locationIds: {
+      type: [Schema.Types.ObjectId],
+      ref: 'Location',
+      default: [],
+    },
     locationId: {
       type: Schema.Types.ObjectId,
       ref: 'Location',
-      required: false, // Temporarily optional for migration
+      required: false, // Legacy field for backward compatibility
     },
     sectionId: { 
       type: Schema.Types.ObjectId, 

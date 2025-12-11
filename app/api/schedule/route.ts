@@ -2,6 +2,7 @@ import dbConnect from "@/utils/mongodb";
 import { NextRequest, NextResponse } from "next/server";
 import LocationScheduleModel from "@/models/LocationSchedule";
 import { requireAuth } from "@/utils/authHelpers";
+import { getAvailableTimeSlots } from "@/utils/timeSlotGenerator";
 
 interface Schedule {
   [day: string]: { date: string; time: string; _id: string }[];
@@ -12,67 +13,11 @@ interface LocationSchedule {
   schedule: Schedule;
 }
 
-// export async function GET(request: NextRequest) {
-//   await dbConnect();
-
-//   try {
-//     const { searchParams } = new URL(request.url);
-//     const location = searchParams.get("location");
-//     const day = searchParams.get("day");
-//     const date = searchParams.get("date");
-
-//     if (!location || !day) {
-//       return NextResponse.json(
-//         { message: "Location and day are required!" },
-//         { status: 400 }
-//       );
-//     }
-//     const defaultDate = "00:00:00";
-
-//     // Prepare date conditions (both default and filtered)
-//     const dateConditions = date
-//       ? [defaultDate, date]
-//       : [defaultDate];
-      
-//     const filter = {
-//       location,
-//       [`schedule.${day}`]: {
-//         $elemMatch: {
-//           date: { $in: dateConditions },
-//         },
-//       },
-//     };
-
-//     // Query with typing to ensure scheduleDocument is correctly inferred
-//     const scheduleDocument = await LocationScheduleModel.findOne(filter, {
-//       [`schedule.${day}`]: 1, // Only include the specific day's data
-//     }).lean<LocationSchedule | null>();
-
-//     if (!scheduleDocument || !scheduleDocument.schedule[day]) {
-//       return NextResponse.json(
-//         { success: true, data: [] }, // Return empty array for no schedules
-//         { status: 200 }
-//       );
-//     }
-
-//     // Sort the day's schedule by time in ascending order
-//     const daySchedule = scheduleDocument.schedule[day].sort(
-//       (a, b) => a.time.localeCompare(b.time)
-//     );
-
-//     return NextResponse.json(
-//       { success: true, data: daySchedule },
-//       { status: 200 }
-//     );
-//   } catch (error) {
-//     console.error("Error fetching schedule:", error);
-//     return NextResponse.json({ message: "Server Error" }, { status: 500 });
-//   }
-// }
-
-
-// POST API: Create a new schedule
-
+/**
+ * GET /api/schedule
+ * Get available time slots with priority: Section Schedule > Location Schedule > Custom
+ * Query params: location, day, date, sectionId (optional)
+ */
 export async function GET(request: NextRequest) {
   try {
     // Authenticate request
@@ -87,6 +32,7 @@ export async function GET(request: NextRequest) {
     const location = searchParams.get("location");
     const day = searchParams.get("day");
     const date = searchParams.get("date");
+    const sectionId = searchParams.get("sectionId"); // New: section-specific support
 
     if (!location || !day) {
       return NextResponse.json(
@@ -95,48 +41,25 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Default date to always include
-    const defaultDate = "00:00:00";
-
-    // Prepare date conditions (both default and filtered)
-    const dateConditions = date
-      ? [defaultDate, date]
-      : [defaultDate];
-
-    const filter = {
+    // Use the new priority-based time slot generator
+    const timeSlots = await getAvailableTimeSlots(
+      sectionId || null,
       location,
-      [`schedule.${day}`]: {
-        $elemMatch: {
-          date: { $in: dateConditions },
-        },
-      },
-    };
-
-    // Query the database for matching schedules
-    const scheduleDocument = await LocationScheduleModel.findOne(filter, {
-      [`schedule.${day}`]: 1, // Only include the specific day's data
-    }).lean<LocationSchedule | null>();
-
-    if (!scheduleDocument || !scheduleDocument.schedule[day]) {
-      return NextResponse.json(
-        { success: true, data: [] }, // Return empty array for no schedules
-        { status: 200 }
-      );
-    }
-
-    // Filter schedules by the default and specified dates
-    const daySchedule = scheduleDocument.schedule[day];
-    const filteredSchedules = daySchedule.filter((item) =>
-      [defaultDate, date].includes(item.date)
+      day,
+      date || undefined
     );
 
-    // Sort the merged schedules by time in ascending order
-    const sortedSchedules = filteredSchedules.sort((a, b) =>
-      a.time.localeCompare(b.time)
-    );
+    // Convert to the expected format (backward compatible)
+    const formattedSlots = timeSlots.map((slot) => ({
+      time: slot.time,
+      date: slot.date,
+      isAvailable: slot.isAvailable,
+      isDefault: slot.isDefault,
+      source: slot.source,
+    }));
 
     return NextResponse.json(
-      { success: true, data: sortedSchedules },
+      { success: true, data: formattedSlots },
       { status: 200 }
     );
   } catch (error) {

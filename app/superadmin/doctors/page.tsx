@@ -4,34 +4,28 @@ import SuperAdminLayout from '@/components/superadmin/SuperAdminLayout';
 import DataTable from '@/components/superadmin/DataTable';
 import Modal from '@/components/superadmin/Modal';
 import FormField from '@/components/superadmin/FormField';
-import { doctorsApi, sectionsApi, Doctor, Section } from '@/services/api';
+import { doctorsApi, sectionsApi, locationsApi, Doctor, Section, Location } from '@/services/api';
 import toast from 'react-hot-toast';
-import { Plus, Clock } from 'lucide-react';
+import { Plus } from 'lucide-react';
 
 export default function DoctorsPage() {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingDoctor, setEditingDoctor] = useState<Doctor | null>(null);
   const [formData, setFormData] = useState({
     name: '',
-    email: '',
-    phone: '',
-    specialization: '',
     sectionId: '',
-    isActive: true,
-    schedule: [] as any[]
+    locationIds: [] as string[]
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-
-  const daysOfWeek = [
-    'Luni', 'Marți', 'Miercuri', 'Joi', 'Vineri', 'Sâmbătă', 'Duminică'
-  ];
 
   useEffect(() => {
     fetchDoctors();
     fetchSections();
+    fetchLocations();
   }, []);
 
   const fetchDoctors = async () => {
@@ -57,6 +51,16 @@ export default function DoctorsPage() {
     }
   };
 
+  const fetchLocations = async () => {
+    try {
+      const response = await locationsApi.getAll();
+      setLocations(response.data.data);
+    } catch (error) {
+      console.error('Error fetching locations:', error);
+      toast.error('Nu s-au putut încărca locațiile');
+    }
+  };
+
   const validateForm = () => {
     const errors: Record<string, string> = {};
 
@@ -68,8 +72,8 @@ export default function DoctorsPage() {
       errors.sectionId = 'Secțiunea este obligatorie';
     }
 
-    if (formData.email && !/\S+@\S+\.\S+/.test(formData.email)) {
-      errors.email = 'Email-ul este invalid';
+    if (!formData.locationIds || formData.locationIds.length === 0) {
+      errors.locationIds = 'Cel puțin o locație este obligatorie';
     }
 
     setFormErrors(errors);
@@ -107,14 +111,22 @@ export default function DoctorsPage() {
     const sectionIdValue = typeof doctor.sectionId === 'string' 
       ? doctor.sectionId 
       : doctor.sectionId?._id || '';
+    
+    // Handle both locationId (single) and locationIds (array) for backward compatibility
+    let locationIdsValue: string[] = [];
+    if ((doctor as any).locationIds && Array.isArray((doctor as any).locationIds)) {
+      locationIdsValue = (doctor as any).locationIds.map((loc: any) => 
+        typeof loc === 'string' ? loc : loc._id || loc
+      );
+    } else if ((doctor as any).locationId) {
+      const locId = (doctor as any).locationId;
+      locationIdsValue = [typeof locId === 'string' ? locId : locId._id || ''];
+    }
+    
     setFormData({
       name: doctor.name,
-      email: doctor.email || '',
-      phone: doctor.phone || '',
-      specialization: doctor.specialization || '',
       sectionId: sectionIdValue,
-      isActive: doctor.isActive,
-      schedule: doctor.schedule
+      locationIds: locationIdsValue
     });
     setModalOpen(true);
   };
@@ -143,12 +155,8 @@ export default function DoctorsPage() {
   const resetForm = () => {
     setFormData({
       name: '',
-      email: '',
-      phone: '',
-      specialization: '',
       sectionId: '',
-      isActive: true,
-      schedule: []
+      locationIds: []
     });
     setFormErrors({});
   };
@@ -160,50 +168,22 @@ export default function DoctorsPage() {
     }));
   };
 
-  const addTimeSlot = (dayIndex: number) => {
-    const newSchedule = [...formData.schedule];
-    if (!newSchedule[dayIndex]) {
-      newSchedule[dayIndex] = {
-        day: daysOfWeek[dayIndex],
-        timeSlots: [],
-        isWorkingDay: true
-      };
-    }
-    newSchedule[dayIndex].timeSlots.push({
-      startTime: '09:00',
-      endTime: '17:00',
-      isAvailable: true
+  const handleLocationToggle = (locationId: string) => {
+    setFormData(prev => {
+      const currentIds = prev.locationIds || [];
+      const newIds = currentIds.includes(locationId)
+        ? currentIds.filter(id => id !== locationId)
+        : [...currentIds, locationId];
+      return { ...prev, locationIds: newIds };
     });
-    setFormData({ ...formData, schedule: newSchedule });
-  };
-
-  const removeTimeSlot = (dayIndex: number, slotIndex: number) => {
-    const newSchedule = [...formData.schedule];
-    if (newSchedule[dayIndex]) {
-      newSchedule[dayIndex].timeSlots.splice(slotIndex, 1);
-      setFormData({ ...formData, schedule: newSchedule });
+    // Clear error when user selects a location
+    if (formErrors.locationIds) {
+      setFormErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors.locationIds;
+        return newErrors;
+      });
     }
-  };
-
-  const updateTimeSlot = (dayIndex: number, slotIndex: number, field: string, value: any) => {
-    const newSchedule = [...formData.schedule];
-    if (newSchedule[dayIndex] && newSchedule[dayIndex].timeSlots[slotIndex]) {
-      newSchedule[dayIndex].timeSlots[slotIndex][field] = value;
-      setFormData({ ...formData, schedule: newSchedule });
-    }
-  };
-
-  const toggleWorkingDay = (dayIndex: number) => {
-    const newSchedule = [...formData.schedule];
-    if (!newSchedule[dayIndex]) {
-      newSchedule[dayIndex] = {
-        day: daysOfWeek[dayIndex],
-        timeSlots: [],
-        isWorkingDay: true
-      };
-    }
-    newSchedule[dayIndex].isWorkingDay = !newSchedule[dayIndex].isWorkingDay;
-    setFormData({ ...formData, schedule: newSchedule });
   };
 
   const columns = [
@@ -224,46 +204,21 @@ export default function DoctorsPage() {
       }
     },
     {
-      key: 'specialization',
-      label: 'Specialization',
-      sortable: true,
-      render: (value: string) => value || '-'
-    },
-    {
-      key: 'email',
-      label: 'Email',
-      sortable: true,
-      render: (value: string) => value || '-'
-    },
-    {
-      key: 'schedule',
-      label: 'Schedule',
+      key: 'locations',
+      label: 'Locations',
       sortable: false,
-      render: (value: any[]) => {
-        const workingDays = value.filter(day => day.isWorkingDay);
-        return (
-          <div className="flex items-center">
-            <Clock className="h-4 w-4 mr-1 text-gray-400" />
-            <span className="text-sm text-gray-600">
-              {workingDays.length} day{workingDays.length !== 1 ? 's' : ''}
-            </span>
-          </div>
-        );
+      render: (value: any, row: Doctor) => {
+        const locationIds = (row as any).locationIds || ((row as any).locationId ? [(row as any).locationId] : []);
+        const locationNames = locationIds
+          .map((locId: any) => {
+            const loc = typeof locId === 'object' && locId?.name 
+              ? locId.name 
+              : locations.find(l => l._id === (typeof locId === 'string' ? locId : locId._id))?.name;
+            return loc;
+          })
+          .filter(Boolean);
+        return locationNames.length > 0 ? locationNames.join(', ') : '-';
       }
-    },
-    {
-      key: 'isActive',
-      label: 'Status',
-      sortable: true,
-      render: (value: boolean) => (
-        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-          value 
-            ? 'bg-green-100 text-green-800' 
-            : 'bg-red-100 text-red-800'
-        }`}>
-          {value ? 'Active' : 'Inactive'}
-        </span>
-      )
     },
     {
       key: 'createdAt',
@@ -308,53 +263,19 @@ export default function DoctorsPage() {
           isOpen={modalOpen}
           onClose={() => setModalOpen(false)}
           title={editingDoctor ? 'Editează Medic' : 'Adaugă Medic Nou'}
-          size="xl"
+          size="md"
         >
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <FormField
-                label="Nume Medic"
-                name="name"
-                type="text"
-                value={formData.name}
-                onChange={(value) => setFormData({ ...formData, name: value })}
-                error={formErrors.name}
-                required
-                placeholder="Introdu numele medicului"
-              />
-
-              <FormField
-                label="Specializare"
-                name="specialization"
-                type="text"
-                value={formData.specialization}
-                onChange={(value) => setFormData({ ...formData, specialization: value })}
-                error={formErrors.specialization}
-                placeholder="Introdu specializarea"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <FormField
-                label="Email"
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={(value) => setFormData({ ...formData, email: value })}
-                error={formErrors.email}
-                placeholder="Introdu email-ul"
-              />
-
-              <FormField
-                label="Telefon"
-                name="phone"
-                type="text"
-                value={formData.phone}
-                onChange={(value) => setFormData({ ...formData, phone: value })}
-                error={formErrors.phone}
-                placeholder="Introdu numărul de telefon"
-              />
-            </div>
+            <FormField
+              label="Nume Medic"
+              name="name"
+              type="text"
+              value={formData.name}
+              onChange={(value) => setFormData({ ...formData, name: value })}
+              error={formErrors.name}
+              required
+              placeholder="Introdu numele medicului"
+            />
 
             <FormField
               label="Secțiune"
@@ -367,81 +288,32 @@ export default function DoctorsPage() {
               options={getSectionOptions()}
             />
 
-            <FormField
-              label="Activ"
-              name="isActive"
-              type="checkbox"
-              value={formData.isActive}
-              onChange={(value) => setFormData({ ...formData, isActive: value })}
-            />
-
-            {/* Weekly Schedule */}
             <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Program Săptămânal</h3>
-              <div className="space-y-4">
-                {daysOfWeek.map((day, dayIndex) => (
-                  <div key={day} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={formData.schedule[dayIndex]?.isWorkingDay || false}
-                          onChange={() => toggleWorkingDay(dayIndex)}
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                        />
-                        <label className="ml-2 text-sm font-medium text-gray-900">
-                          {day}
-                        </label>
-                      </div>
-                      {formData.schedule[dayIndex]?.isWorkingDay && (
-                        <button
-                          type="button"
-                          onClick={() => addTimeSlot(dayIndex)}
-                          className="text-sm text-blue-600 hover:text-blue-800"
-                        >
-                          + Adaugă Interval Orar
-                        </button>
-                      )}
-                    </div>
-
-                    {formData.schedule[dayIndex]?.isWorkingDay && (
-                      <div className="space-y-2">
-                        {formData.schedule[dayIndex].timeSlots.map((slot: any, slotIndex: number) => (
-                          <div key={slotIndex} className="flex items-center space-x-2">
-                            <input
-                              type="time"
-                              value={slot.startTime}
-                              onChange={(e) => updateTimeSlot(dayIndex, slotIndex, 'startTime', e.target.value)}
-                              className="block w-32 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                            />
-                            <span className="text-gray-500">până la</span>
-                            <input
-                              type="time"
-                              value={slot.endTime}
-                              onChange={(e) => updateTimeSlot(dayIndex, slotIndex, 'endTime', e.target.value)}
-                              className="block w-32 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                            />
-                            <input
-                              type="checkbox"
-                              checked={slot.isAvailable}
-                              onChange={(e) => updateTimeSlot(dayIndex, slotIndex, 'isAvailable', e.target.checked)}
-                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                            />
-                            <label className="text-sm text-gray-700">Disponibil</label>
-                            <button
-                              type="button"
-                              onClick={() => removeTimeSlot(dayIndex, slotIndex)}
-                              className="text-red-600 hover:text-red-800 text-sm"
-                            >
-                              Elimină
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Locații <span className="text-red-500">*</span>
+              </label>
+              <div className="space-y-2">
+                {locations.map((location) => (
+                  <div key={location._id} className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id={`location-${location._id}`}
+                      checked={formData.locationIds.includes(location._id)}
+                      onChange={() => handleLocationToggle(location._id)}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <label
+                      htmlFor={`location-${location._id}`}
+                      className="ml-2 text-sm text-gray-700 cursor-pointer"
+                    >
+                      {location.name}
+                    </label>
                   </div>
                 ))}
               </div>
+              {formErrors.locationIds && (
+                <p className="mt-1 text-sm text-red-600">{formErrors.locationIds}</p>
+              )}
             </div>
 
             <div className="flex justify-end space-x-3 pt-4">

@@ -1,6 +1,6 @@
 import api from "@/services/api";
 
-// Utility function to fetch time slots by location, day, and optional date
+// Utility function to fetch time slots by location, day, optional date, and optional sectionId
 export async function getTimeSlotsByLocationAndDay(filters:any) {
   try {
     const response = await api.get("/schedule", {
@@ -19,7 +19,12 @@ export async function getTimeSlotsByLocationAndDay(filters:any) {
 }
 
 // High-level function to handle API calls
-export const fetchTimeSlotsAPI = async (location:string, dayName:string, date?:string) => {
+export const fetchTimeSlotsAPI = async (
+  location: string,
+  dayName: string,
+  date?: string,
+  sectionId?: string
+) => {
   if (!location || !dayName) {
     return [];
   }
@@ -28,6 +33,7 @@ export const fetchTimeSlotsAPI = async (location:string, dayName:string, date?:s
     location,
     day: dayName, 
     ...(date && { date }),
+    ...(sectionId && { sectionId }), // Include sectionId if provided
   };
 
   try {

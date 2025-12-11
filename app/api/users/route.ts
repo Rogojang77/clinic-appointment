@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     if (isActive !== null) filter.isActive = isActive === 'true';
     
     const users = await UserModel.find(filter)
-      .select('-password -forgotpasswordToken -forgotpasswordToeknExpiry -verifyToken -verifyTokenExpiry')
+      .select('-password')
       .sort({ createdAt: -1 });
     
     // Populate section information if needed
@@ -137,10 +137,6 @@ export async function POST(request: NextRequest) {
     // Return user without password
     const userResponse = user.toObject();
     delete userResponse.password;
-    delete userResponse.forgotpasswordToken;
-    delete userResponse.forgotpasswordToeknExpiry;
-    delete userResponse.verifyToken;
-    delete userResponse.verifyTokenExpiry;
     
     return NextResponse.json({
       success: true,

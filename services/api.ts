@@ -118,10 +118,17 @@ export interface DashboardData {
     totalSections: number;
     totalActivitySchedules: number;
     totalDoctors: number;
+    totalAppointments: number;
     activeUsers: number;
     activeSections: number;
     activeActivitySchedules: number;
     activeDoctors: number;
+    activeAppointments: number;
+    confirmedAppointments: number;
+    unconfirmedAppointments: number;
+    appointmentsToday: number;
+    appointmentsThisWeek: number;
+    appointmentsThisMonth: number;
   };
   usersByRole: Record<string, number>;
   sectionsWithSchedules: Array<{
@@ -135,9 +142,18 @@ export interface DashboardData {
     isActive: boolean;
     userCount: number;
   }>;
+  appointmentsByLocation: Array<{
+    location: string;
+    count: number;
+  }>;
+  appointmentsByTestType: Array<{
+    testType: string;
+    count: number;
+  }>;
   recentActivity: {
     users: User[];
     schedules: ActivitySchedule[];
+    appointments: any[];
   };
 }
 

@@ -96,7 +96,8 @@ export async function POST(request: NextRequest) {
     notes, 
     doctorName,
     sectionId,
-    doctorId
+    doctorId,
+    isDefault
   } = await request.json();
 
   try {
@@ -107,14 +108,17 @@ export async function POST(request: NextRequest) {
     }
     const { payload: decoded } = authResult;
 
-    // Get the count of default time slots
-    const defaultSlotCount = await countDefaultTimeSlots(location, day);
+    // Get the count of default time slots (with section priority)
+    const defaultSlotCount = await countDefaultTimeSlots(location, day, sectionId);
 
     // Create new appointment
+    // Ensure date is a Date object (handle both string and Date formats)
+    const appointmentDate = date instanceof Date ? date : new Date(date);
+    
     const newAppointment = new AppointmentModel({
       location,
       day,
-      date,
+      date: appointmentDate,
       time,
       patientName,
       doctorName,
@@ -124,6 +128,7 @@ export async function POST(request: NextRequest) {
       notes,
       sectionId,
       doctorId,
+      isDefault: isDefault !== undefined ? isDefault : false, // Use provided isDefault, default to false if not provided
     });
 
     // Save the appointment to the database

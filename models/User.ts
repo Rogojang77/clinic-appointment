@@ -17,10 +17,6 @@ const UserSchema: Schema = new Schema(
     },
     accessSection: { type: String, required: true },
     role: { type: String, enum: ["admin", "operator"], default: "operator" },
-    forgotpasswordToken: String,
-    forgotpasswordToeknExpiry: Date,
-    verifyToken: String,
-    verifyTokenExpiry: Date,
     createdAt: { type: Date, default: Date.now },
   },
   {

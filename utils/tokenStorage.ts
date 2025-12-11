@@ -53,11 +53,4 @@ export function removeToken(): void {
   }
 }
 
-/**
- * Check if a token exists in localStorage
- * @returns True if token exists, false otherwise
- */
-export function hasToken(): boolean {
-  return getToken() !== null;
-}
 

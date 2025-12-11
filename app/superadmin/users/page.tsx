@@ -4,14 +4,12 @@ import SuperAdminLayout from '@/components/superadmin/SuperAdminLayout';
 import DataTable from '@/components/superadmin/DataTable';
 import Modal from '@/components/superadmin/Modal';
 import FormField from '@/components/superadmin/FormField';
-import { usersApi, sectionsApi, User, Section } from '@/services/api';
-import { departmentsData } from '@/lib/department';
+import { usersApi, User, Section } from '@/services/api';
 import toast from 'react-hot-toast';
 import { Plus } from 'lucide-react';
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
-  const [sections, setSections] = useState<Section[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -28,7 +26,6 @@ export default function UsersPage() {
 
   useEffect(() => {
     fetchUsers();
-    fetchSections();
   }, []);
 
   const fetchUsers = async () => {
@@ -41,16 +38,6 @@ export default function UsersPage() {
       toast.error('Nu s-au putut încărca utilizatorii');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchSections = async () => {
-    try {
-      const response = await sectionsApi.getAll();
-      setSections(response.data.data);
-    } catch (error) {
-      console.error('Error fetching sections:', error);
-      toast.error('Nu s-au putut încărca secțiunile');
     }
   };
 
@@ -71,10 +58,6 @@ export default function UsersPage() {
       errors.password = 'Parola este obligatorie pentru utilizatorii noi';
     }
 
-    if (!formData.accessSection) {
-      errors.accessSection = 'Secțiunea este obligatorie';
-    }
-
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -92,7 +75,6 @@ export default function UsersPage() {
         const updateData: any = {
           username: formData.username,
           email: formData.email,
-          accessSection: formData.accessSection,
           role: formData.role,
           isAdmin: formData.isAdmin,
           isverified: formData.isverified
@@ -127,7 +109,7 @@ export default function UsersPage() {
       username: user.username,
       email: user.email,
       password: '', // Don't pre-fill password
-      accessSection: user.accessSection,
+      accessSection: '',
       role: user.role,
       isAdmin: user.isAdmin,
       isverified: user.isverified
@@ -169,32 +151,6 @@ export default function UsersPage() {
     setFormErrors({});
   };
 
-  const getSectionOptions = () => {
-    let sectionOptions = [];
-    
-    if (sections.length > 0) {
-      // If sections exist, use them
-      sectionOptions = sections.map(section => ({
-        value: section._id,
-        label: section.name
-      }));
-    } else {
-      // If no sections exist, use departments as temporary options
-      sectionOptions = departmentsData.map(dept => ({
-        value: dept.name, // Use department name as value temporarily
-        label: dept.name
-      }));
-    }
-    
-    // Add "All Sections" option for SuperAdmin users
-    sectionOptions.unshift({
-      value: "all",
-      label: "Toate Secțiunile"
-    });
-    
-    return sectionOptions;
-  };
-
   const columns = [
     {
       key: 'username',
@@ -220,7 +176,7 @@ export default function UsersPage() {
             {value}
           </span>
           {row.isAdmin && (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 mt-1">
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-150 text-red-800 mt-1">
               SuperAdmin
             </span>
           )}
@@ -240,7 +196,7 @@ export default function UsersPage() {
       render: (value: boolean) => (
         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
           value 
-            ? 'bg-green-100 text-green-800' 
+            ? 'bg-green-200 text-green-800' 
             : 'bg-yellow-100 text-yellow-800'
         }`}>
           {value ? 'Verificat' : 'În așteptare'}
@@ -326,17 +282,6 @@ export default function UsersPage() {
               error={formErrors.password}
               required={!editingUser}
               placeholder={editingUser ? "Lasă gol pentru a păstra parola actuală" : "Introdu parola"}
-            />
-
-            <FormField
-              label="Section"
-              name="accessSection"
-              type="select"
-              value={formData.accessSection}
-              onChange={(value) => setFormData({ ...formData, accessSection: value })}
-              error={formErrors.accessSection}
-              required
-              options={getSectionOptions()}
             />
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

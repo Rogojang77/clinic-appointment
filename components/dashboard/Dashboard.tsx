@@ -1,11 +1,10 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 import TableComponent from "../common/table-component";
 import CalendarGrid from "./calender-grid";
 import AppointmentAddEdit from "./add-appointment";
-import { departmentsData } from "@/lib/department";
 import dayjs from "dayjs";
 import { dayNameMap } from "@/lib/dayNameMap";
 import Spinner from "../common/loader";
@@ -322,12 +321,12 @@ const Dashboard = () => {
     <div className="flex flex-col items-center justify-start  bg-gray-200 py-5">
       <div className="w-full max-w-7xl p-5 space-y-4 bg-gray-100 rounded-md shadow-md py-5 ">
         <div className="flex justify-between ">
-          <p>Lista departamentului :</p>
+          <p>Listă secții:</p>
           <div className="flex items-center gap-2">
             {isLoadingSections && (
               <Spinner />
             )}
-            <p className="text-sm text-gray-500">Secțiuni: {sections?.length || 0} | Locație: {location}</p>
+            <p className="text-sm text-gray-500">Secții: {sections?.length || 0} | Locație: {location}</p>
           </div>
         </div>
         {isLoadingSections ? (
@@ -335,7 +334,7 @@ const Dashboard = () => {
             <Spinner />
           </div>
         ) : (
-          <div className="w-full flex justify-start px-5 mb-3 gap-3">
+          <div className="w-full flex justify-start mb-3 gap-3">
           <div
             className={`cursor-pointer flex justify-center items-center px-4 py-1 text-white text-[15px] font-medium rounded-md text-center ${
               selectedTestType === null
@@ -348,7 +347,7 @@ const Dashboard = () => {
           </div>
           {sections?.find((section: any) => section.name === "Ecografie") && (
             <div
-              className={`cursor-pointer flex justify-center items-center px-4 py-1 text-white text-[15px] font-medium rounded-md text-center ${
+              className={`cursor-pointer flex justify-center items-center py-1 text-white px-4 text-[15px] font-medium rounded-md text-center ${
                 selectedTestType === "Ecografie"
                   ? "bg-green-500"
                   : "bg-indigo-500 hover:bg-green-500"
@@ -365,10 +364,10 @@ const Dashboard = () => {
             <Spinner />
           </div>
         ) : (
-          <div className="w-full bg-white grid lg:grid-cols-5 md:grid-cols-3 grid-cols-2 gap-3 p-5">
+          <div className="w-full grid lg:grid-cols-5 md:grid-cols-3 grid-cols-2 gap-3">
           {sections?.filter((section: any) => section.name !== "Ecografie").map((section: any, index) => (
             <div
-              className={`cursor-pointer flex justify-center items-center px-4 py-1 text-white text-[15px] font-medium rounded-md  text-center ${
+              className={`cursor-pointer flex justify-center items-center py-1 text-white px-4 text-[15px] font-medium rounded-md  text-center ${
                 selectedTestType === section.name
                   ? "bg-green-500"
                   : "bg-indigo-500 hover:bg-green-500"

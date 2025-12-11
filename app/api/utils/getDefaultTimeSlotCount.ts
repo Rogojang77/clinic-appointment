@@ -1,5 +1,6 @@
 import dbConnect from "@/utils/mongodb";
 import LocationScheduleModel from "@/models/LocationSchedule";
+import SectionScheduleModel from "@/models/SectionSchedule";
 
 interface Schedule {
   [day: string]: { date: string; time: string; _id: string }[];
@@ -10,13 +11,44 @@ interface LocationSchedule {
   schedule: Schedule;
 }
 
-export default async function countDefaultTimeSlots(location: string, day: string): Promise<number> {
+/**
+ * Count default time slots with priority: Section Schedule > Location Schedule
+ */
+export default async function countDefaultTimeSlots(
+  location: string,
+  day: string,
+  sectionId?: string
+): Promise<number> {
   await dbConnect();
 
   try {
     // Default date to count
     const defaultDate = "00:00:00";
 
+    // Priority 1: Check section schedule if sectionId is provided
+    if (sectionId) {
+      const sectionSchedule = await SectionScheduleModel.findOne({
+        sectionId,
+        location,
+        [`schedule.${day}`]: {
+          $elemMatch: {
+            date: defaultDate,
+          },
+        },
+      }).lean();
+
+      if (sectionSchedule && sectionSchedule.schedule[day]) {
+        const daySchedule = sectionSchedule.schedule[day];
+        const defaultDateSlots = daySchedule.filter(
+          (item: any) => item.date === defaultDate
+        );
+        if (defaultDateSlots.length > 0) {
+          return defaultDateSlots.length;
+        }
+      }
+    }
+
+    // Priority 2: Fall back to location schedule
     const filter = {
       location,
       [`schedule.${day}`]: {
@@ -26,9 +58,8 @@ export default async function countDefaultTimeSlots(location: string, day: strin
       },
     };
 
-    // Query the database for matching schedules
     const scheduleDocument = await LocationScheduleModel.findOne(filter, {
-      [`schedule.${day}`]: 1, // Only include the specific day's data
+      [`schedule.${day}`]: 1,
     }).lean<LocationSchedule | null>();
 
     if (!scheduleDocument || !scheduleDocument.schedule[day]) {
@@ -37,7 +68,9 @@ export default async function countDefaultTimeSlots(location: string, day: strin
 
     // Filter schedules by the default date
     const daySchedule = scheduleDocument.schedule[day];
-    const defaultDateSlots = daySchedule.filter((item) => item.date === defaultDate);
+    const defaultDateSlots = daySchedule.filter(
+      (item) => item.date === defaultDate
+    );
 
     // Return the count of default date time slots
     return defaultDateSlots.length;

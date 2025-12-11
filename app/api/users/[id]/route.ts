@@ -22,7 +22,7 @@ export async function GET(
     }
     
     const user = await UserModel.findById(id)
-      .select('-password -forgotpasswordToken -forgotpasswordToeknExpiry -verifyToken -verifyTokenExpiry');
+      .select('-password');
     
     if (!user) {
       return NextResponse.json(
@@ -168,7 +168,7 @@ export async function PUT(
       id,
       updateData,
       { new: true, runValidators: true }
-    ).select('-password -forgotpasswordToken -forgotpasswordToeknExpiry -verifyToken -verifyTokenExpiry');
+    ).select('-password');
     
     return NextResponse.json({
       success: true,

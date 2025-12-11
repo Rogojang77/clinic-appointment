@@ -18,12 +18,27 @@ export async function GET(request: NextRequest) {
 
     const filter: any = {};
     if (sectionId) filter.sectionId = sectionId;
-    if (locationId) filter.locationId = locationId;
+    if (locationId) {
+      // Support both locationId (legacy) and locationIds (new)
+      filter.$or = [
+        { locationIds: locationId },
+        { locationId: locationId }
+      ];
+    }
     if (isActive !== null) filter.isActive = isActive === 'true';
     if (specialization) filter.specialization = { $regex: specialization, $options: 'i' };
     
     const doctors = await DoctorModel.find(filter)
-      .populate('locationId', 'name isActive')
+      .populate({
+        path: 'locationIds',
+        select: 'name isActive',
+        strictPopulate: false
+      })
+      .populate({
+        path: 'locationId',
+        select: 'name isActive',
+        strictPopulate: false
+      })
       .populate('sectionId', 'name description')
       .sort({ name: 1 });
     
@@ -52,18 +67,43 @@ export async function POST(request: NextRequest) {
       email, 
       phone, 
       specialization, 
-      locationId,
+      locationIds,
+      locationId, // Legacy support
       sectionId, 
       schedule = [],
       isActive = true 
     } = body;
     
     // Validate required fields
-    if (!name || !sectionId || !locationId) {
+    if (!name || !sectionId) {
       return NextResponse.json(
-        { success: false, error: 'Doctor name, section, and location are required' },
+        { success: false, error: 'Doctor name and section are required' },
         { status: 400 }
       );
+    }
+    
+    // Handle locationIds (array) or locationId (single) for backward compatibility
+    const finalLocationIds = locationIds && Array.isArray(locationIds) && locationIds.length > 0
+      ? locationIds
+      : locationId 
+        ? [locationId]
+        : [];
+    
+    if (finalLocationIds.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'At least one location is required' },
+        { status: 400 }
+      );
+    }
+    
+    // Validate location IDs
+    for (const locId of finalLocationIds) {
+      if (!mongoose.Types.ObjectId.isValid(locId)) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid location ID' },
+          { status: 400 }
+        );
+      }
     }
     
     // Validate ObjectId
@@ -125,7 +165,7 @@ export async function POST(request: NextRequest) {
       email,
       phone,
       specialization,
-      locationId,
+      locationIds: finalLocationIds,
       sectionId,
       schedule,
       isActive
