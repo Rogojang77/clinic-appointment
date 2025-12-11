@@ -7,11 +7,11 @@ import mongoose from 'mongoose';
 // GET /api/activity-schedules/section/[sectionId] - Get all activity schedules for a specific section
 export async function GET(
   request: NextRequest,
-  context: any
+  context: { params: Promise<{ sectionId: string }> }
 ) {
   try {
     await dbConnect();
-    const { sectionId } = context.params;
+    const { sectionId } = await context.params;
     
     if (!mongoose.Types.ObjectId.isValid(sectionId)) {
       return NextResponse.json(

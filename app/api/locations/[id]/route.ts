@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/utils/mongodb';
 import LocationModel from '@/models/Location';
+import mongoose from 'mongoose';
 
 // GET /api/locations/[id] - Get a specific location
 export async function GET(
   request: NextRequest,
-  context: any
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
-    const { id } = context.params;
+    const { id } = await context.params;
     
     if (!id || id === 'undefined') {
       return NextResponse.json(
@@ -43,13 +44,13 @@ export async function GET(
 // PUT /api/locations/[id] - Update a specific location
 export async function PUT(
   request: NextRequest,
-  context: any
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
-    const { id } = context.params;
+    const { id } = await context.params;
     
-    if (!id || id === 'undefined') {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
         { success: false, error: 'Invalid location ID' },
         { status: 400 }
@@ -105,11 +106,11 @@ export async function PUT(
 // DELETE /api/locations/[id] - Delete a specific location
 export async function DELETE(
   request: NextRequest,
-  context: any
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
-    const { id } = context.params;
+    const { id } = await context.params;
     
     if (!id || id === 'undefined') {
       return NextResponse.json(

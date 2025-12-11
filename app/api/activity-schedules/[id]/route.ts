@@ -6,8 +6,8 @@ import mongoose from 'mongoose';
 const isValidObjectId = (id: string) => mongoose.Types.ObjectId.isValid(id);
 
 // GET /api/activity-schedules/[id]
-export async function GET(req: NextRequest, context: any) {
-  const { id } = context.params;
+export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params;
 
   try {
     await dbConnect();
@@ -41,8 +41,8 @@ export async function GET(req: NextRequest, context: any) {
 }
 
 // PUT /api/activity-schedules/[id]
-export async function PUT(request: NextRequest, context: any) {
-  const { id } = context.params;
+export async function PUT(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params;
 
   try {
     await dbConnect();
@@ -98,8 +98,8 @@ export async function PUT(request: NextRequest, context: any) {
 }
 
 // DELETE /api/activity-schedules/[id]
-export async function DELETE(request: NextRequest, context: any) {
-  const { id } = context.params;
+export async function DELETE(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params;
 
   try {
     await dbConnect();

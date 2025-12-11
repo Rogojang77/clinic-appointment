@@ -104,12 +104,28 @@ export interface Doctor {
   email?: string;
   phone?: string;
   specialization?: string;
+  locationIds?: string[] | Array<{ _id: string; name: string; isActive: boolean }>;
+  locationId?: string | { _id: string; name: string; isActive: boolean }; // Legacy field
   sectionId: string | { _id: string; name: string; description?: string };
   schedule: DailySchedule[];
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
   section?: Section;
+}
+
+// DTOs for API requests - frontend should only send these fields
+export interface CreateDoctorDto {
+  name: string;
+  sectionId: string;
+  locationIds: string[];
+}
+
+export interface UpdateDoctorDto extends Partial<CreateDoctorDto> {
+  email?: string;
+  phone?: string;
+  specialization?: string;
+  // Note: schedule and isActive are DB-only fields, should not be sent from frontend
 }
 
 export interface DashboardData {
@@ -255,10 +271,10 @@ export const doctorsApi = {
   getById: (id: string) => 
     api.get<{ success: boolean; data: Doctor }>(`/doctors/${id}`),
   
-  create: (data: Omit<Doctor, '_id' | 'createdAt' | 'updatedAt' | 'section'>) => 
+  create: (data: CreateDoctorDto) => 
     api.post<{ success: boolean; data: Doctor }>('/doctors', data),
   
-  update: (id: string, data: Partial<Doctor>) => 
+  update: (id: string, data: UpdateDoctorDto) => 
     api.put<{ success: boolean; data: Doctor }>(`/doctors/${id}`, data),
   
   delete: (id: string) => 

@@ -270,23 +270,26 @@ export default function SectionSchedulesPage() {
 
   const columns = [
     {
-      header: 'Section',
-      accessor: (schedule: SectionSchedule) => {
+      key: 'section',
+      label: 'Section',
+      render: (value: any, schedule: SectionSchedule) => {
         const section = sections.find((s) => s._id === schedule.sectionId);
         return section?.name || 'Unknown';
       },
     },
     {
-      header: 'Location',
-      accessor: 'location',
+      key: 'location',
+      label: 'Location',
     },
     {
-      header: 'Slot Interval',
-      accessor: (schedule: SectionSchedule) => `${schedule.slotInterval || 15} minutes`,
+      key: 'slotInterval',
+      label: 'Slot Interval',
+      render: (value: any, schedule: SectionSchedule) => `${schedule.slotInterval || 15} minutes`,
     },
     {
-      header: 'Actions',
-      accessor: (schedule: SectionSchedule) => (
+      key: 'actions',
+      label: 'Actions',
+      render: (value: any, schedule: SectionSchedule) => (
         <div className="flex gap-2">
           <button
             onClick={() => handleEdit(schedule)}
@@ -341,64 +344,54 @@ export default function SectionSchedulesPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <FormField
               label="Section"
+              name="sectionId"
+              type="select"
+              value={formData.sectionId}
+              onChange={(value) =>
+                setFormData({ ...formData, sectionId: value })
+              }
               error={formErrors.sectionId}
               required
-            >
-              <select
-                value={formData.sectionId}
-                onChange={(e) =>
-                  setFormData({ ...formData, sectionId: e.target.value })
-                }
-                className="w-full p-2 border rounded"
-                disabled={!!editingSchedule}
-              >
-                <option value="">Select Section</option>
-                {sections.map((section) => (
-                  <option key={section._id} value={section._id}>
-                    {section.name}
-                  </option>
-                ))}
-              </select>
-            </FormField>
+              options={[
+                { value: '', label: 'Select Section' },
+                ...sections.map((section) => ({
+                  value: section._id,
+                  label: section.name
+                }))
+              ]}
+            />
 
             <FormField
               label="Location"
+              name="location"
+              type="select"
+              value={formData.location}
+              onChange={(value) =>
+                setFormData({ ...formData, location: value })
+              }
               error={formErrors.location}
               required
-            >
-              <select
-                value={formData.location}
-                onChange={(e) =>
-                  setFormData({ ...formData, location: e.target.value })
-                }
-                className="w-full p-2 border rounded"
-                disabled={!!editingSchedule}
-              >
-                <option value="">Select Location</option>
-                {locations.map((location) => (
-                  <option key={location._id} value={location.name}>
-                    {location.name}
-                  </option>
-                ))}
-              </select>
-            </FormField>
+              options={[
+                { value: '', label: 'Select Location' },
+                ...locations.map((location) => ({
+                  value: location.name,
+                  label: location.name
+                }))
+              ]}
+            />
 
-            <FormField label="Slot Interval (minutes)">
-              <input
-                type="number"
-                min="5"
-                max="60"
-                step="5"
-                value={formData.slotInterval}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    slotInterval: parseInt(e.target.value) || 15,
-                  })
-                }
-                className="w-full p-2 border rounded"
-              />
-            </FormField>
+            <FormField
+              label="Slot Interval (minutes)"
+              name="slotInterval"
+              type="text"
+              value={formData.slotInterval.toString()}
+              onChange={(value) =>
+                setFormData({
+                  ...formData,
+                  slotInterval: parseInt(value) || 15,
+                })
+              }
+            />
 
             {/* Day Selection */}
             <div className="border-t pt-4">

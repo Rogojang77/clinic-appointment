@@ -57,6 +57,8 @@ export async function GET(request: NextRequest) {
 }
 
 // POST /api/doctors - Create a new doctor
+// Only accepts: name, sectionId, locationIds
+// Auto-fills: schedule: [], isActive: true
 export async function POST(request: NextRequest) {
   try {
     await dbConnect();
@@ -68,10 +70,7 @@ export async function POST(request: NextRequest) {
       phone, 
       specialization, 
       locationIds,
-      locationId, // Legacy support
-      sectionId, 
-      schedule = [],
-      isActive = true 
+      sectionId
     } = body;
     
     // Validate required fields
@@ -82,14 +81,8 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Handle locationIds (array) or locationId (single) for backward compatibility
-    const finalLocationIds = locationIds && Array.isArray(locationIds) && locationIds.length > 0
-      ? locationIds
-      : locationId 
-        ? [locationId]
-        : [];
-    
-    if (finalLocationIds.length === 0) {
+    // Validate locationIds is provided and is an array
+    if (!locationIds || !Array.isArray(locationIds) || locationIds.length === 0) {
       return NextResponse.json(
         { success: false, error: 'At least one location is required' },
         { status: 400 }
@@ -97,7 +90,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Validate location IDs
-    for (const locId of finalLocationIds) {
+    for (const locId of locationIds) {
       if (!mongoose.Types.ObjectId.isValid(locId)) {
         return NextResponse.json(
           { success: false, error: 'Invalid location ID' },
@@ -106,7 +99,7 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    // Validate ObjectId
+    // Validate sectionId ObjectId
     if (!mongoose.Types.ObjectId.isValid(sectionId)) {
       return NextResponse.json(
         { success: false, error: 'Invalid section ID' },
@@ -136,39 +129,16 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Validate schedule structure if provided
-    if (schedule && Array.isArray(schedule)) {
-      const validDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-      for (const daySchedule of schedule) {
-        if (!validDays.includes(daySchedule.day)) {
-          return NextResponse.json(
-            { success: false, error: `Invalid day: ${daySchedule.day}` },
-            { status: 400 }
-          );
-        }
-        
-        if (daySchedule.timeSlots && Array.isArray(daySchedule.timeSlots)) {
-          for (const timeSlot of daySchedule.timeSlots) {
-            if (!timeSlot.startTime || !timeSlot.endTime) {
-              return NextResponse.json(
-                { success: false, error: 'Time slots must have startTime and endTime' },
-                { status: 400 }
-              );
-            }
-          }
-        }
-      }
-    }
-    
+    // Auto-fill DB-only fields: schedule and isActive
     const doctor = new DoctorModel({
       name,
-      email,
-      phone,
-      specialization,
-      locationIds: finalLocationIds,
+      email: email || undefined,
+      phone: phone || undefined,
+      specialization: specialization || undefined,
+      locationIds,
       sectionId,
-      schedule,
-      isActive
+      schedule: [], // Auto-filled
+      isActive: true // Auto-filled
     });
     
     await doctor.save();
@@ -180,6 +150,11 @@ export async function POST(request: NextRequest) {
     );
     
     // Populate the response
+    await doctor.populate({
+      path: 'locationIds',
+      select: 'name isActive',
+      strictPopulate: false
+    });
     await doctor.populate('sectionId', 'name description');
     
     return NextResponse.json({

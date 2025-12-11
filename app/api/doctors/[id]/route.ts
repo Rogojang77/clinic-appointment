@@ -7,11 +7,11 @@ import mongoose from 'mongoose';
 // GET /api/doctors/[id] - Get a specific doctor
 export async function GET(
   request: NextRequest,
-  context: any
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
-    const { id } = context.params;
+    const { id } = await context.params;
     
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
@@ -62,13 +62,15 @@ export async function GET(
 }
 
 // PUT /api/doctors/[id] - Update a doctor
+// Accepts partial updates: name, email, phone, specialization, locationIds, sectionId
+// Does NOT accept schedule or isActive (DB-only fields)
 export async function PUT(
   request: NextRequest,
-  context: any
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
-    const { id } = context.params;
+    const { id } = await context.params;
     
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
@@ -84,10 +86,7 @@ export async function PUT(
       phone, 
       specialization, 
       locationIds,
-      locationId, // Legacy support
-      sectionId, 
-      schedule, 
-      isActive 
+      sectionId
     } = body;
     
     // Check if doctor exists
@@ -101,9 +100,10 @@ export async function PUT(
     
     // Check for name conflicts if being changed
     if (name && name !== existingDoctor.name) {
+      const targetSectionId = sectionId || existingDoctor.sectionId.toString();
       const nameConflict = await DoctorModel.findOne({ 
         name, 
-        sectionId: sectionId || existingDoctor.sectionId,
+        sectionId: targetSectionId,
         _id: { $ne: id }
       });
       if (nameConflict) {
@@ -132,41 +132,11 @@ export async function PUT(
       }
     }
     
-    // Validate schedule structure if provided
-    if (schedule && Array.isArray(schedule)) {
-      const validDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-      for (const daySchedule of schedule) {
-        if (!validDays.includes(daySchedule.day)) {
-          return NextResponse.json(
-            { success: false, error: `Invalid day: ${daySchedule.day}` },
-            { status: 400 }
-          );
-        }
-        
-        if (daySchedule.timeSlots && Array.isArray(daySchedule.timeSlots)) {
-          for (const timeSlot of daySchedule.timeSlots) {
-            if (!timeSlot.startTime || !timeSlot.endTime) {
-              return NextResponse.json(
-                { success: false, error: 'Time slots must have startTime and endTime' },
-                { status: 400 }
-              );
-            }
-          }
-        }
-      }
-    }
-    
     const updateData: any = {};
     
-    // Handle locationIds (array) or locationId (single) for backward compatibility
-    if (locationIds !== undefined || locationId !== undefined) {
-      const finalLocationIds = locationIds && Array.isArray(locationIds) && locationIds.length > 0
-        ? locationIds
-        : locationId 
-          ? [locationId]
-          : [];
-      
-      if (finalLocationIds.length === 0) {
+    // Handle locationIds if provided
+    if (locationIds !== undefined) {
+      if (!Array.isArray(locationIds) || locationIds.length === 0) {
         return NextResponse.json(
           { success: false, error: 'At least one location is required' },
           { status: 400 }
@@ -174,7 +144,7 @@ export async function PUT(
       }
       
       // Validate location IDs
-      for (const locId of finalLocationIds) {
+      for (const locId of locationIds) {
         if (!mongoose.Types.ObjectId.isValid(locId)) {
           return NextResponse.json(
             { success: false, error: 'Invalid location ID' },
@@ -183,14 +153,13 @@ export async function PUT(
         }
       }
       
-      updateData.locationIds = finalLocationIds;
+      updateData.locationIds = locationIds;
     }
+    
     if (name !== undefined) updateData.name = name;
     if (email !== undefined) updateData.email = email;
     if (phone !== undefined) updateData.phone = phone;
     if (specialization !== undefined) updateData.specialization = specialization;
-    if (schedule !== undefined) updateData.schedule = schedule;
-    if (isActive !== undefined) updateData.isActive = isActive;
     
     // Handle section change
     if (sectionId && sectionId !== existingDoctor.sectionId.toString()) {
@@ -242,11 +211,11 @@ export async function PUT(
 // DELETE /api/doctors/[id] - Delete a doctor
 export async function DELETE(
   request: NextRequest,
-  context: any
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     await dbConnect();
-    const { id } = context.params;
+    const { id } = await context.params;
     
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
