@@ -4,6 +4,8 @@ import SectionScheduleModel from "@/models/SectionSchedule";
 import AppointmentModel from "@/models/Appointment";
 import { locationTimeSlots } from "@/lib/timeSlots";
 import mongoose from "mongoose";
+import type { ISectionSchedule, ISchedule } from "@/models/SectionSchedule";
+import type { ILocationSchedule } from "@/models/LocationSchedule";
 
 export interface TimeSlot {
   time: string;
@@ -12,6 +14,17 @@ export interface TimeSlot {
   isDefault?: boolean; // true if from default weekly schedule
   source?: "section" | "location" | "custom"; // Where this slot came from
 }
+
+// Type for lean result from Mongoose queries
+type LeanSectionSchedule = Omit<ISectionSchedule, keyof mongoose.Document> & {
+  _id: mongoose.Types.ObjectId;
+  __v: number;
+};
+
+type LeanLocationSchedule = Omit<ILocationSchedule, keyof mongoose.Document> & {
+  _id: mongoose.Types.ObjectId;
+  __v: number;
+};
 
 /**
  * Generate time slots from a start and end time with a given interval
@@ -70,16 +83,16 @@ async function getSectionSchedule(
   const sectionSchedule = await SectionScheduleModel.findOne({
     sectionId,
     location,
-  }).lean();
+  }).lean() as LeanSectionSchedule | null;
 
-  if (!sectionSchedule || !sectionSchedule.schedule[day]) {
+  if (!sectionSchedule || !sectionSchedule.schedule || !sectionSchedule.schedule[day as keyof ISchedule]) {
     return [];
   }
 
   const defaultDate = "00:00:00";
   const dateConditions = date ? [defaultDate, date] : [defaultDate];
 
-  const daySchedule = sectionSchedule.schedule[day];
+  const daySchedule = sectionSchedule.schedule[day as keyof ISchedule];
   const filteredSlots = daySchedule.filter((slot) =>
     dateConditions.includes(slot.date)
   );
@@ -105,9 +118,9 @@ async function getLocationSchedule(
 
   const locationSchedule = await LocationScheduleModel.findOne({
     location,
-  }).lean();
+  }).lean() as LeanLocationSchedule | null;
 
-  if (!locationSchedule || !locationSchedule.schedule[day]) {
+  if (!locationSchedule || !locationSchedule.schedule || !locationSchedule.schedule[day as keyof ISchedule]) {
     // Fallback to static data
     const staticSlots = locationTimeSlots[location]?.[day] || [];
     return convertToTimeSlotObjects(staticSlots, date || "00:00:00", "location");
@@ -116,7 +129,7 @@ async function getLocationSchedule(
   const defaultDate = "00:00:00";
   const dateConditions = date ? [defaultDate, date] : [defaultDate];
 
-  const daySchedule = locationSchedule.schedule[day];
+  const daySchedule = locationSchedule.schedule[day as keyof ISchedule];
   const filteredSlots = daySchedule.filter((slot) =>
     dateConditions.includes(slot.date)
   );
@@ -260,9 +273,9 @@ export async function hasSchedule(
       sectionId,
       location,
       [`schedule.${day}`]: { $exists: true, $ne: [] },
-    }).lean();
+    }).lean() as LeanSectionSchedule | null;
 
-    if (sectionSchedule && sectionSchedule.schedule[day]?.length > 0) {
+    if (sectionSchedule && sectionSchedule.schedule && sectionSchedule.schedule[day as keyof ISchedule]?.length > 0) {
       return true;
     }
   }
@@ -271,9 +284,9 @@ export async function hasSchedule(
   const locationSchedule = await LocationScheduleModel.findOne({
     location,
     [`schedule.${day}`]: { $exists: true, $ne: [] },
-  }).lean();
+  }).lean() as LeanLocationSchedule | null;
 
-  if (locationSchedule && locationSchedule.schedule[day]?.length > 0) {
+  if (locationSchedule && locationSchedule.schedule && locationSchedule.schedule[day as keyof ISchedule]?.length > 0) {
     return true;
   }
 

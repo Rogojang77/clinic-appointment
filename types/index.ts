@@ -115,12 +115,15 @@ export interface Doctor {
 // Activity schedule interface
 export interface ActivitySchedule {
   _id: string;
-  userId: string;
-  sectionId: string;
+  userId: string | { _id: string; username: string; email: string; role: string };
+  sectionId: string | { _id: string; name: string; description?: string };
   schedule: DailySchedule[];
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
+  // Populated fields from backend
+  user?: User | { _id: string; username: string; email: string; role: string };
+  section?: Section | { _id: string; name: string; description?: string };
 }
 
 // User with populated section
