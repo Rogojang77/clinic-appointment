@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
     const day = searchParams.get("day");
     const date = searchParams.get("date");
     const sectionId = searchParams.get("sectionId"); // New: section-specific support
+    const testType = searchParams.get("testType"); // Fallback for older appointments without sectionId
 
     if (!location || !day) {
       return NextResponse.json(
@@ -42,11 +43,13 @@ export async function GET(request: NextRequest) {
     }
 
     // Use the new priority-based time slot generator
+    // Pass testType as fallback when sectionId is not available
     const timeSlots = await getAvailableTimeSlots(
       sectionId || null,
       location,
       day,
-      date || undefined
+      date || undefined,
+      testType || undefined
     );
 
     // Convert to the expected format (backward compatible)

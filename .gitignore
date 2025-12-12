@@ -12,6 +12,9 @@
 
 # testing
 /coverage
+start.sh
+backup.sh
+sync-db.sh
 
 # next.js
 /.next/

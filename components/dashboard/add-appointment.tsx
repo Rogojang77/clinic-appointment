@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Formik, Form, Field } from "formik";
 import * as Yup from "yup";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ChevronUp, ChevronDown } from "lucide-react";
+import { ChevronUp, ChevronDown, Loader } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -257,6 +257,10 @@ export default function AppointmentAddEdit({
   const [locations, setLocations] = useState<Location[]>([]);
   const { timeSlots, setTimeSlots } = useTimeSlotStore();
   const [hasScheduleForDay, setHasScheduleForDay] = useState(true); // Track if schedule exists
+  const [isLoadingTimeSlots, setIsLoadingTimeSlots] = useState(false); // Track loading state for time slots
+  const setFieldValueRef = useRef<((field: string, value: any) => void) | null>(null);
+  const lastFetchedLocationRef = useRef<string>(""); // Track last fetched location to prevent duplicate requests
+  const isLocationChangeInProgressRef = useRef<boolean>(false); // Track if location change is in progress
 
   const appointmentDate = dayjs(date).startOf("day");
   const formattedDate = appointmentDate.format("YYYY-MM-DD");
@@ -357,15 +361,16 @@ export default function AppointmentAddEdit({
   };
 
   // Fetch sections based on selected location
-  const fetchSections = useCallback(async () => {
-    if (!location || locations.length === 0) {
+  const fetchSections = useCallback(async (locationToUse?: string) => {
+    const locationValue = locationToUse || location;
+    if (!locationValue || locations.length === 0) {
       setSections([]);
       return;
     }
 
     try {
       // Find the locationId from the location name
-      const selectedLocation = locations.find((loc: any) => loc.name === location);
+      const selectedLocation = locations.find((loc: any) => loc.name === locationValue);
       
       if (!selectedLocation) {
         // Try fetching all active sections if location not found
@@ -434,34 +439,70 @@ export default function AppointmentAddEdit({
   };
 
   // get the time slots based on section + location + day
-  const fetchTimeSlots = useCallback(async (sectionIdFromForm?: string) => {
-    if (location && day) {
-      // Format date properly for API (YYYY-MM-DD)
-      const formattedDate = date?.format("YYYY-MM-DD");
+  const fetchTimeSlots = useCallback(async (sectionIdFromForm?: string, locationToUse?: string, testTypeToUse?: string) => {
+    const locationValue = locationToUse || location;
+    if (locationValue && day) {
+      // Prevent duplicate requests for the same location
+      const requestKey = `${locationValue}-${day}-${sectionIdFromForm || 'no-section'}-${date?.format("YYYY-MM-DD") || ''}`;
+      if (lastFetchedLocationRef.current === requestKey) {
+        return; // Skip if we're already fetching/fetched for this exact combination
+      }
+      lastFetchedLocationRef.current = requestKey;
       
-      // Use sectionId from form values, or fall back to selectedSection state
-      // Convert empty string to undefined to ensure proper API handling
-      const sectionIdToUse = sectionIdFromForm || selectedSection || undefined;
-      const normalizedSectionId = sectionIdToUse && sectionIdToUse.trim() !== "" 
-        ? sectionIdToUse 
-        : undefined;
-      
-      // Always pass sectionId dynamically - no hardcoded values
-      // This ensures ALL sections get proper booking filtering
-      const slots = await fetchTimeSlotsAPI(
-        location,
-        day,
-        formattedDate,
-        normalizedSectionId
-      );
-      setTimeSlots(slots || []);
-      // Check if schedule exists (if slots are empty, no schedule exists)
-      setHasScheduleForDay((slots || []).length > 0);
+      setIsLoadingTimeSlots(true);
+      try {
+        // Format date properly for API (YYYY-MM-DD)
+        const formattedDate = date?.format("YYYY-MM-DD");
+        
+        // Use sectionId from form values, or fall back to selectedSection state
+        // Convert empty string to undefined to ensure proper API handling
+        const sectionIdToUse = sectionIdFromForm || selectedSection || undefined;
+        const normalizedSectionId = sectionIdToUse && sectionIdToUse.trim() !== "" 
+          ? sectionIdToUse 
+          : undefined;
+        
+        // Get testType for fallback when sectionId is not available
+        // Use testType from parameter, or from data when editing, or from selected section name
+        let testTypeForFilter: string | undefined = undefined;
+        if (!normalizedSectionId) {
+          if (testTypeToUse) {
+            testTypeForFilter = testTypeToUse;
+          } else if (data?.testType) {
+            testTypeForFilter = data.testType;
+          } else if (selectedSection) {
+            // Try to get testType from selected section name
+            const selectedSectionObj = sections.find((s: any) => s._id === selectedSection);
+            if (selectedSectionObj?.name) {
+              testTypeForFilter = selectedSectionObj.name;
+            }
+          }
+        }
+        
+        // Always pass sectionId dynamically - no hardcoded values
+        // Pass testType as fallback when sectionId is not available (for older appointments)
+        const slots = await fetchTimeSlotsAPI(
+          locationValue,
+          day,
+          formattedDate,
+          normalizedSectionId,
+          testTypeForFilter
+        );
+        setTimeSlots(slots || []);
+        // Check if schedule exists (if slots are empty, no schedule exists)
+        setHasScheduleForDay((slots || []).length > 0);
+      } catch (error) {
+        console.error("Error fetching time slots:", error);
+        setTimeSlots([]);
+        setHasScheduleForDay(false);
+      } finally {
+        setIsLoadingTimeSlots(false);
+      }
     } else {
       setTimeSlots([]);
       setHasScheduleForDay(false);
+      setIsLoadingTimeSlots(false);
     }
-  }, [location, day, date, selectedSection, setTimeSlots]);
+  }, [location, day, date, selectedSection, sections, data, setTimeSlots]);
 
 
   // Removed duplicate fetchTimeSlots - handled by the effect that watches selectedSection
@@ -505,6 +546,19 @@ export default function AppointmentAddEdit({
     }
   }, [data?.sectionId, isModalOpen]); // Removed selectedSection from deps to prevent loop
 
+  // Auto-select Ecografie section when isEco is true and sections are loaded
+  useEffect(() => {
+    if (isEco && !data && isModalOpen && sections.length > 0 && !selectedSection && setFieldValueRef.current) {
+      const ecografieSection = sections.find((s: any) => s.name === "Ecografie");
+      if (ecografieSection) {
+        setSelectedSection(ecografieSection._id);
+        setFieldValueRef.current("sectionId", ecografieSection._id);
+        setFieldValueRef.current("testType", "Ecografie");
+      }
+    }
+  }, [isEco, data, isModalOpen, sections, selectedSection]);
+
+
   // Fetch doctors when section changes
   useEffect(() => {
     if (selectedSection) {
@@ -516,9 +570,20 @@ export default function AppointmentAddEdit({
   }, [selectedSection]);
 
   // Fetch time slots when section, location, day, or date changes
+  // Note: Location changes are handled in the onChange handler to prevent duplicate requests
   useEffect(() => {
+    // Skip if location change is in progress (handled by onChange handler)
+    if (isLocationChangeInProgressRef.current) {
+      return;
+    }
+    
     if (location && day) {
-      fetchTimeSlots(selectedSection || undefined);
+      // Only fetch if location prop actually changed (not from user selection in form)
+      // This prevents duplicate requests when user selects location via radio button
+      const currentRequestKey = `${location}-${day}-${selectedSection || 'no-section'}-${date?.format("YYYY-MM-DD") || ''}`;
+      if (lastFetchedLocationRef.current !== currentRequestKey) {
+        fetchTimeSlots(selectedSection || undefined, location);
+      }
     }
   }, [selectedSection, location, day, date, fetchTimeSlots]);
 
@@ -581,6 +646,9 @@ export default function AppointmentAddEdit({
               {({ errors, touched, setFieldValue, values }) => {
                 // Handle section change logic directly in onChange handler instead of useEffect
                 // This prevents infinite loops from useEffect dependencies
+                
+                // Store setFieldValue in ref for use in useEffect
+                setFieldValueRef.current = setFieldValue;
 
                 return (
                 <Form className="space-y-4 py-3">
@@ -632,51 +700,46 @@ export default function AppointmentAddEdit({
                       <Label htmlFor="sectionId" className="mb-1.5 block text-sm font-medium">
                         Secțiune <span className="text-red-500">*</span>
                       </Label>
-                      {isEco ? (
-                        <Field 
-                          name="testType" 
-                          as={Input} 
-                          id="testType"
-                          placeholder="Ecografie"
-                          className="w-full"
-                        />
-                      ) : (
-                        <Field
-                          as="select"
-                          name="sectionId"
-                          id="sectionId"
-                          onChange={(e: any) => {
-                            const selectedSectionId = e.target.value;
-                            const selectedSectionObj = sections.find((s: any) => s._id === selectedSectionId);
-                            setFieldValue("sectionId", selectedSectionId);
-                            setFieldValue("testType", selectedSectionObj?.name || "");
-                            // Update selectedSection state - this will trigger useEffect to refetch time slots and doctors
-                            setSelectedSection(selectedSectionId);
-                            setFieldValue("doctorId", ""); // Reset doctor when section changes
-                            setFieldValue("doctorName", ""); // Reset doctor name
-                            setFieldValue("time", ""); // Reset time when section changes
-                            setSelectTime({ time: "", date: "" }); // Reset selected time
-                          }}
-                          disabled={!location || sections.length === 0}
-                          value={values.sectionId}
-                          className="block w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                        >
-                          <option value="">
-                            {!location ? "Selectează mai întâi o locație" : sections.length === 0 ? "Nu există secțiuni pentru această locație" : "Selectează Secțiunea"}
+                      <Field
+                        as="select"
+                        name="sectionId"
+                        id="sectionId"
+                        onChange={async (e: any) => {
+                          const selectedSectionId = e.target.value;
+                          const selectedSectionObj = sections.find((s: any) => s._id === selectedSectionId);
+                          setFieldValue("sectionId", selectedSectionId);
+                          setFieldValue("testType", selectedSectionObj?.name || "");
+                          // Update selectedSection state - this will trigger useEffect to refetch time slots and doctors
+                          setSelectedSection(selectedSectionId);
+                          setFieldValue("doctorId", ""); // Reset doctor when section changes
+                          setFieldValue("doctorName", ""); // Reset doctor name
+                          setFieldValue("time", ""); // Reset time when section changes
+                          setSelectTime({ time: "", date: "" }); // Reset selected time
+                          
+                          // Fetch time slots for the new section using current form location
+                          if (values.location && day) {
+                            await fetchTimeSlots(selectedSectionId, values.location, selectedSectionObj?.name);
+                          }
+                        }}
+                        disabled={!location || sections.length === 0}
+                        value={values.sectionId}
+                        className="block w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      >
+                        <option value="">
+                          {!location ? "Selectează mai întâi o locație" : sections.length === 0 ? "Nu există secțiuni pentru această locație" : "Selectează Secțiunea"}
+                        </option>
+                        {sections.map((section: any) => (
+                          <option key={section._id} value={section._id}>
+                            {section.name}
                           </option>
-                          {sections.map((section: any) => (
-                            <option key={section._id} value={section._id}>
-                              {section.name}
-                            </option>
-                          ))}
-                        </Field>
-                      )}
+                        ))}
+                      </Field>
                       {errors.sectionId && touched.sectionId && (
                         <div className="text-red-500 text-sm mt-1">{errors.sectionId}</div>
                       )}
                     </div>
 
-                    {isEco ? (
+                    {values.testType === "Ecografie" ? (
                       <div>
                         <Label htmlFor="doctorName" className="mb-1.5 block text-sm font-medium">
                           Medic
@@ -755,8 +818,12 @@ export default function AppointmentAddEdit({
                             value={loc.name}
                             className="w-4 h-4 text-blue-600"
                             checked={values.location === loc.name}
-                            onChange={(e: any) => {
-                              setFieldValue("location", e.target.value);
+                            onChange={async (e: any) => {
+                              const newLocation = e.target.value;
+                              // Set flag to prevent useEffect from triggering duplicate request
+                              isLocationChangeInProgressRef.current = true;
+                              
+                              setFieldValue("location", newLocation);
                               // Reset section and related fields when location changes
                               setFieldValue("sectionId", "");
                               setFieldValue("testType", "");
@@ -765,6 +832,20 @@ export default function AppointmentAddEdit({
                               setFieldValue("time", "");
                               setSelectedSection("");
                               setSelectTime({ time: "", date: "" });
+                              
+                              // Fetch sections for the new location
+                              await fetchSections(newLocation);
+                              
+                              // Fetch time slots for the new location (if day is available)
+                              // Pass testType from form values as fallback when sectionId is not available
+                              if (day) {
+                                await fetchTimeSlots(undefined, newLocation, values.testType);
+                              }
+                              
+                              // Reset flag after a short delay to allow useEffect to skip
+                              setTimeout(() => {
+                                isLocationChangeInProgressRef.current = false;
+                              }, 100);
                             }}
                           />
                           <span className="font-medium">{loc.name}</span>
@@ -846,7 +927,19 @@ export default function AppointmentAddEdit({
                       </div>
                     ) : (
                       <div>
-                        {timeSlots.length === 0 ? (
+                        {isLoadingTimeSlots ? (
+                          <div className="text-center py-12 px-4 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                            <div className="flex flex-col items-center justify-center gap-3">
+                              <Loader className="h-8 w-8 animate-spin text-blue-500" />
+                              <p className="text-sm font-medium text-gray-600">
+                                Se încarcă sloturile de timp...
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                Vă rugăm să așteptați
+                              </p>
+                            </div>
+                          </div>
+                        ) : timeSlots.length === 0 ? (
                           <div className="text-center py-8 px-4 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
                             <p className="text-sm font-medium text-gray-600 mb-2">
                               Nu există programare disponibilă
@@ -866,13 +959,13 @@ export default function AppointmentAddEdit({
                               Selectați un slot disponibil:
                             </p>
                             <div className="grid lg:grid-cols-8 md:grid-cols-6 grid-cols-4 gap-1.5">
-                              {timeSlots.map((slot: any) => {
+                              {timeSlots.map((slot: any, index: number) => {
                                 // Use backend's isAvailable flag - backend already filters by section+location+date
                                 const isAvailable = slot.isAvailable !== false; // Default to true if not specified
 
                                 return (
                                   <button
-                                    key={slot.time}
+                                    key={`${slot.time}-${slot.date || index}`}
                                     type="button"
                                     className={`px-3 py-2.5 rounded-md text-sm font-medium transition-all duration-200 ${
                                       selectTime?.time === slot.time

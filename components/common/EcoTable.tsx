@@ -1,4 +1,4 @@
-import { Edit, Trash, Loader, ChevronLeft, ChevronRight } from "lucide-react";
+import { Edit, Trash, Loader } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -59,8 +59,6 @@ const EcoTable: React.FC<TableComponentProps> = ({
     useState<Appointment | null>(null);
   const [sortField, setSortField] = useState<string>('');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
 
   // Normalize the time for sorting
   const normalizeTime = (time: string) => {
@@ -74,7 +72,6 @@ const EcoTable: React.FC<TableComponentProps> = ({
       setSortField(field);
       setSortDirection('asc');
     }
-    setCurrentPage(1);
   };
 
   const sortAppointments = (appts: Appointment[]) => {
@@ -129,6 +126,9 @@ const EcoTable: React.FC<TableComponentProps> = ({
     ),
   }));
 
+  // Flatten appointments to check if there are any appointments
+  const allAppointments = appointmentsGroupedByTime.flatMap(({ appointments }) => appointments);
+
   const confirmDelete = (appointment: Appointment) => {
     setAppointmentToDelete(appointment);
     setIsModalOpen(true);
@@ -166,22 +166,6 @@ const EcoTable: React.FC<TableComponentProps> = ({
       setUpdatingAppointmentId(null);
     }
   };
-  
-
-  // Flatten appointments for pagination
-  const allAppointments = appointmentsGroupedByTime.flatMap(({ appointments }) => appointments);
-  const totalPages = Math.ceil(allAppointments.length / itemsPerPage);
-  const startIdx = (currentPage - 1) * itemsPerPage;
-  const endIdx = startIdx + itemsPerPage;
-  const paginatedAppointments = allAppointments.slice(startIdx, endIdx);
-
-  // Re-group paginated appointments by timeSlot
-  const paginatedGroupedByTime = timeSlots.map((timeSlot: any) => ({
-    timeSlot: timeSlot?.time,
-    appointments: paginatedAppointments.filter(
-      (appt) => normalizeTime(appt.time) === normalizeTime(timeSlot?.time)
-    ),
-  }));
 
   const SortableHeader = ({ field, label }: { field: string; label: string }) => (
     <th
@@ -230,9 +214,9 @@ const EcoTable: React.FC<TableComponentProps> = ({
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {paginatedAppointments.length > 0 ? (
+              {allAppointments.length > 0 ? (
                 <>
-                  {paginatedGroupedByTime?.map(
+                  {appointmentsGroupedByTime?.map(
                     ({ timeSlot, appointments }, groupIndex) => {
                       return appointments.length > 0 ? (
                         appointments.map((appointment, index) => (
@@ -318,81 +302,6 @@ const EcoTable: React.FC<TableComponentProps> = ({
             </tbody>
           </table>
         </div>
-        
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-            <div className="flex-1 flex justify-between sm:hidden">
-              <button
-                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                disabled={currentPage === 1}
-                className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Anterior
-              </button>
-              <button
-                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                disabled={currentPage === totalPages}
-                className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Următor
-              </button>
-            </div>
-            <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm text-gray-700">
-                  Afișare{' '}
-                  <span className="font-medium">{startIdx + 1}</span>
-                  {' '}până la{' '}
-                  <span className="font-medium">
-                    {Math.min(startIdx + itemsPerPage, allAppointments.length)}
-                  </span>
-                  {' '}din{' '}
-                  <span className="font-medium">{allAppointments.length}</span>
-                  {' '}rezultate
-                </p>
-              </div>
-              <div>
-                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-                  <button
-                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                    disabled={currentPage === 1}
-                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ChevronLeft className="h-5 w-5" />
-                  </button>
-                  
-                  {[...Array(totalPages)].map((_, i) => {
-                    const page = i + 1;
-                    const isCurrentPage = page === currentPage;
-                    
-                    return (
-                      <button
-                        key={page}
-                        onClick={() => setCurrentPage(page)}
-                        className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                          isCurrentPage
-                            ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
-                            : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    );
-                  })}
-                  
-                  <button
-                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                    disabled={currentPage === totalPages}
-                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ChevronRight className="h-5 w-5" />
-                  </button>
-                </nav>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Delete Confirmation Dialog */}

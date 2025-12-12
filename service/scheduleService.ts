@@ -23,7 +23,8 @@ export const fetchTimeSlotsAPI = async (
   location: string,
   dayName: string,
   date?: string,
-  sectionId?: string
+  sectionId?: string,
+  testType?: string
 ) => {
   if (!location || !dayName) {
     return [];
@@ -34,6 +35,7 @@ export const fetchTimeSlotsAPI = async (
     day: dayName, 
     ...(date && { date }),
     ...(sectionId && { sectionId }), // Include sectionId if provided
+    ...(testType && !sectionId && { testType }), // Include testType as fallback when sectionId is not available
   };
 
   try {

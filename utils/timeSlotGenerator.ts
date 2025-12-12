@@ -145,12 +145,14 @@ async function getLocationSchedule(
 
 /**
  * Get booked appointments for a specific section, location, date, and time
+ * Falls back to testType filtering when sectionId is not available (for backward compatibility)
  */
 async function getBookedAppointments(
   sectionId: string | null | undefined,
   location: string,
   date: string,
-  times: string[]
+  times: string[],
+  testType?: string | null | undefined
 ): Promise<Set<string>> {
   await dbConnect();
 
@@ -172,17 +174,20 @@ async function getBookedAppointments(
     $lte: endOfDay,
   };
 
-  // ALWAYS filter by sectionId when provided (section-specific booking)
+  // Priority 1: Filter by sectionId when provided (section-specific booking)
   // This ensures each section only sees its own bookings, not other sections
-  // No hardcoded section names - works dynamically for ALL sections (Ecografie, Chirurgie, etc.)
   if (sectionId) {
     // Ensure sectionId is properly formatted (handle both string and ObjectId)
     filter.sectionId = mongoose.Types.ObjectId.isValid(sectionId) 
       ? new mongoose.Types.ObjectId(sectionId)
       : sectionId;
+  } else if (testType) {
+    // Priority 2: Fall back to testType when sectionId is not available
+    // This handles older appointments that don't have sectionId set
+    filter.testType = testType;
   }
-  // If no sectionId provided, query will not filter by section
-  // But for proper section-specific booking, sectionId should always be provided
+  // If neither sectionId nor testType provided, query will not filter by section/testType
+  // This allows backward compatibility but may show incorrect availability
 
   const appointments = await AppointmentModel.find(filter).lean();
 
@@ -199,7 +204,8 @@ export async function getAvailableTimeSlots(
   sectionId: string | null | undefined,
   location: string,
   day: string,
-  date?: string
+  date?: string,
+  testType?: string | null | undefined
 ): Promise<TimeSlot[]> {
   await dbConnect();
 
@@ -236,7 +242,8 @@ export async function getAvailableTimeSlots(
       sectionId || null,
       location,
       date,
-      timeSlots.map((slot) => slot.time)
+      timeSlots.map((slot) => slot.time),
+      testType || null
     );
 
     timeSlots = timeSlots.map((slot) => ({
@@ -251,7 +258,23 @@ export async function getAvailableTimeSlots(
     }));
   }
 
-  // Sort by time
+  // Deduplicate time slots: if same time exists for both default and specific date,
+  // keep only the one with specific date (prioritize specific over default)
+  const timeSlotMap = new Map<string, TimeSlot>();
+  for (const slot of timeSlots) {
+    const existingSlot = timeSlotMap.get(slot.time);
+    if (!existingSlot) {
+      // No existing slot with this time, add it
+      timeSlotMap.set(slot.time, slot);
+    } else if (slot.date !== "00:00:00" && existingSlot.date === "00:00:00") {
+      // Current slot has specific date, existing has default - replace with specific
+      timeSlotMap.set(slot.time, slot);
+    }
+    // If both are default or both are specific, keep the first one (or could merge properties)
+  }
+
+  // Convert back to array and sort by time
+  timeSlots = Array.from(timeSlotMap.values());
   timeSlots.sort((a, b) => a.time.localeCompare(b.time));
 
   return timeSlots;

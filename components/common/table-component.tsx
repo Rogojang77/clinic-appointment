@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Eye, Edit, Trash, Loader, ChevronLeft, ChevronRight } from "lucide-react";
+import { Eye, Edit, Trash, Loader } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -52,19 +52,12 @@ const TableComponent: React.FC<TableComponentProps> = ({
   onEdit,
   fetchData,
 }) => {
-  const [currentPage, setCurrentPage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [appointmentToDelete, setAppointmentToDelete] =
     useState<Appointment | null>(null);
   const [sortField, setSortField] = useState<string>('');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-
-  const itemsPerPage = 10;
-
-  const handlePageChange = (newPage: number) => {
-    setCurrentPage(newPage);
-  };
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -73,7 +66,6 @@ const TableComponent: React.FC<TableComponentProps> = ({
       setSortField(field);
       setSortDirection('asc');
     }
-    setCurrentPage(1); // Reset to first page when sorting
   };
 
   const sortData = (data: Appointment[]) => {
@@ -147,10 +139,6 @@ const TableComponent: React.FC<TableComponentProps> = ({
 
   const renderTable = (appointmentsToRender: Appointment[], title?: string) => {
     const sortedData = sortData(appointmentsToRender);
-    const totalPages = title ? 1 : Math.ceil(sortedData.length / itemsPerPage);
-    const startIdx = title ? 0 : (currentPage - 1) * itemsPerPage;
-    const endIdx = title ? sortedData.length : startIdx + itemsPerPage;
-    const paginated = sortedData.slice(startIdx, endIdx);
 
     if (appointmentsToRender.length === 0) {
       return null;
@@ -196,7 +184,7 @@ const TableComponent: React.FC<TableComponentProps> = ({
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {paginated.map((appointment, index) => (
+                {sortedData.map((appointment, index) => (
                   <tr
                     key={`${appointment._id}-${index}`}
                     className={`${
@@ -256,81 +244,6 @@ const TableComponent: React.FC<TableComponentProps> = ({
               </tbody>
             </table>
           </div>
-          
-          {/* Pagination */}
-          {!title && totalPages > 1 && (
-            <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-              <div className="flex-1 flex justify-between sm:hidden">
-                <button
-                  onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
-                  disabled={currentPage === 1}
-                  className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Anterior
-                </button>
-                <button
-                  onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
-                  disabled={currentPage === totalPages}
-                  className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Următor
-                </button>
-              </div>
-              <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm text-gray-700">
-                    Afișare{' '}
-                    <span className="font-medium">{startIdx + 1}</span>
-                    {' '}până la{' '}
-                    <span className="font-medium">
-                      {Math.min(startIdx + itemsPerPage, sortedData.length)}
-                    </span>
-                    {' '}din{' '}
-                    <span className="font-medium">{sortedData.length}</span>
-                    {' '}rezultate
-                  </p>
-                </div>
-                <div>
-                  <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-                    <button
-                      onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
-                      disabled={currentPage === 1}
-                      className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <ChevronLeft className="h-5 w-5" />
-                    </button>
-                    
-                    {[...Array(totalPages)].map((_, i) => {
-                      const page = i + 1;
-                      const isCurrentPage = page === currentPage;
-                      
-                      return (
-                        <button
-                          key={page}
-                          onClick={() => handlePageChange(page)}
-                          className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                            isCurrentPage
-                              ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
-                              : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-                          }`}
-                        >
-                          {page}
-                        </button>
-                      );
-                    })}
-                    
-                    <button
-                      onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
-                      disabled={currentPage === totalPages}
-                      className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <ChevronRight className="h-5 w-5" />
-                    </button>
-                  </nav>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     );
