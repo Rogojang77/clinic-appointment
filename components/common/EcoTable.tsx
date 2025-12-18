@@ -1,3 +1,5 @@
+"use client";
+
 import { Edit, Trash, Loader } from "lucide-react";
 import {
   Dialog,

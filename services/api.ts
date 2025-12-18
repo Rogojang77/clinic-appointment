@@ -1,4 +1,5 @@
-import axios from 'axios';
+import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import { getToken, setToken, removeToken } from '@/utils/tokenStorage';
 
 // Base API configuration
 const api = axios.create({
@@ -6,14 +7,41 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true, // Always send cookies (needed for refresh token)
 });
+
+// Flag to prevent multiple simultaneous refresh calls
+let isRefreshing = false;
+// Queue of failed requests waiting for token refresh
+let failedQueue: Array<{
+  resolve: (value?: any) => void;
+  reject: (reason?: any) => void;
+}> = [];
+
+// Process queued requests after token refresh
+const processQueue = (error: AxiosError | null, token: string | null = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  
+  failedQueue = [];
+};
 
 // Add request interceptor to include auth token from localStorage
 api.interceptors.request.use((config) => {
+  // Skip adding token for refresh endpoint to avoid infinite loop
+  if (config.url?.includes('/auth/refresh')) {
+    return config;
+  }
+
   // Get token from localStorage (client-side only)
   if (typeof window !== 'undefined') {
     try {
-      const token = localStorage.getItem('auth_token');
+      const token = getToken();
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
@@ -25,25 +53,111 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Add response interceptor to handle token expiration
+// Add response interceptor to handle token expiration and refresh
 api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    // If we get a 401, the token might be expired
-    if (error.response?.status === 401) {
-      // Clear token from localStorage
-      if (typeof window !== 'undefined') {
-        try {
-          localStorage.removeItem('auth_token');
-          // Redirect to login if we're not already there
+  (response) => {
+    // Safety check: Log and warn if response is not JSON
+    const contentType = response.headers['content-type'];
+    if (contentType && !contentType.includes('application/json')) {
+      console.warn('⚠️ Non-JSON response received:', {
+        url: response.config.url,
+        contentType,
+        status: response.status,
+      });
+    }
+    return response;
+  },
+  async (error: AxiosError) => {
+    // Safety check: Log non-JSON error responses
+    if (error.response) {
+      const contentType = error.response.headers['content-type'];
+      if (contentType && !contentType.includes('application/json')) {
+        console.error('❌ Non-JSON error response:', {
+          url: error.config?.url,
+          contentType,
+          status: error.response.status,
+          statusText: error.response.statusText,
+        });
+      }
+    }
+    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+
+    // Skip refresh logic for refresh endpoint itself or login endpoint
+    if (
+      originalRequest?.url?.includes('/auth/refresh') ||
+      originalRequest?.url?.includes('/login') ||
+      originalRequest?.url?.includes('/register')
+    ) {
+      return Promise.reject(error);
+    }
+
+    // Handle 401 Unauthorized - token expired or invalid
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+      if (isRefreshing) {
+        // If refresh is already in progress, queue this request
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then((token) => {
+            if (originalRequest.headers) {
+              originalRequest.headers.Authorization = `Bearer ${token}`;
+            }
+            return api(originalRequest);
+          })
+          .catch((err) => {
+            return Promise.reject(err);
+          });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        // Call refresh endpoint (refresh token is in HttpOnly cookie)
+        const response = await axios.post('/api/auth/refresh', {}, {
+          withCredentials: true, // Include cookies
+        });
+
+        const { accessToken } = response.data;
+
+        if (accessToken) {
+          // Store new access token
+          setToken(accessToken);
+
+          // Update the original request with new token
+          if (originalRequest.headers) {
+            originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+          }
+
+          // Process queued requests
+          processQueue(null, accessToken);
+
+          // Retry the original request
+          return api(originalRequest);
+        } else {
+          throw new Error('No access token in refresh response');
+        }
+      } catch (refreshError) {
+        // Refresh failed - clear tokens and logout
+        processQueue(refreshError as AxiosError, null);
+        
+        if (typeof window !== 'undefined') {
+          removeToken();
+          
+          // Redirect to login if not already there
+          // Use relative path for redirect (works correctly with current origin)
           if (window.location.pathname !== '/') {
             window.location.href = '/?session=expired';
           }
-        } catch (err) {
-          console.error('Error clearing token:', err);
         }
+
+        return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
       }
     }
+
+    // For other errors, reject normally
     return Promise.reject(error);
   }
 );

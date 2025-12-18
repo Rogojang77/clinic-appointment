@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+"use client";
+
+import { useState } from "react";
 import { Eye, Edit, Trash, Loader } from "lucide-react";
 import {
   Dialog,
@@ -109,10 +111,6 @@ const TableComponent: React.FC<TableComponentProps> = ({
       return 0;
     });
   };
-
-  // Separate appointments by isDefault
-  const defaultAppointments = appointments?.filter((apt: Appointment) => apt.isDefault !== false) || [];
-  const nonDefaultAppointments = appointments?.filter((apt: Appointment) => apt.isDefault === false) || [];
 
   const confirmDelete = (appointment: Appointment) => {
     setAppointmentToDelete(appointment);
@@ -252,10 +250,7 @@ const TableComponent: React.FC<TableComponentProps> = ({
   return (
     <div className="lg:px-10 px-5 mb-5">
       {appointments?.length > 0 ? (
-        <>
-          {renderTable(defaultAppointments)}
-          {nonDefaultAppointments.length > 0 && renderTable(nonDefaultAppointments, "Programări Temporare")}
-        </>
+        renderTable(appointments || [])
       ) : (
         <div className="bg-white shadow rounded-lg">
           <div className="px-4 py-5 sm:p-6 text-center">

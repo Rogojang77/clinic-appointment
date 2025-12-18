@@ -8,7 +8,7 @@ const AppointmentSchema: Schema = new Schema({
   time: { type: String, required: true },
   patientName: { type: String, required: true },
   testType: { type: String, required: true },
-  doctorName: { type: String, required: true }, // Keep for backward compatibility
+  doctorName: { type: String, required: false, default: '' }, // Keep for backward compatibility, now optional
   phoneNumber: { type: String, required: true },
   isConfirmed: { type: Boolean, default: false },
   isDefault: { type: Boolean, default: false },

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import SuperAdminLayout from '@/components/superadmin/SuperAdminLayout';
 import DataTable from '@/components/superadmin/DataTable';
 import Modal from '@/components/superadmin/Modal';
@@ -24,11 +24,7 @@ export default function UsersPage() {
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
       const response = await usersApi.getAll();
@@ -39,7 +35,11 @@ export default function UsersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
 
   const validateForm = () => {
     const errors: Record<string, string> = {};
@@ -187,7 +187,7 @@ export default function UsersPage() {
       key: 'section',
       label: 'Section',
       sortable: false,
-      render: (value: Section) => value?.name || 'Fără secțiune'
+      render: (value: Section) => value?.name || 'Fără secție'
     },
     {
       key: 'isverified',

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import SuperAdminLayout from "@/components/superadmin/SuperAdminLayout";
 import DataTable from "@/components/superadmin/DataTable";
 import Modal from "@/components/superadmin/Modal";
@@ -33,13 +33,7 @@ export default function SectionsPage() {
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    fetchSections();
-    fetchDoctors();
-    fetchLocations();
-  }, []);
-
-  const fetchSections = async () => {
+  const fetchSections = useCallback(async () => {
     try {
       setLoading(true);
       const response = await sectionsApi.getAll();
@@ -60,23 +54,23 @@ export default function SectionsPage() {
       }
     } catch (error) {
       console.error("Error fetching sections:", error);
-      toast.error("Nu s-au putut încărca secțiunile");
+      toast.error("Nu s-au putut încărca secțiile");
       setShowDepartments(true);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const fetchDoctors = async () => {
+  const fetchDoctors = useCallback(async () => {
     try {
       const response = await doctorsApi.getAll();
       setDoctors(response.data.data);
     } catch (error) {
       console.error("Error fetching doctors:", error);
     }
-  };
+  }, []);
 
-  const fetchLocations = async () => {
+  const fetchLocations = useCallback(async () => {
     try {
       const response = await locationsApi.getAll();
       setLocations(response.data.data);
@@ -84,13 +78,19 @@ export default function SectionsPage() {
       console.error("Error fetching locations:", error);
       toast.error("Nu s-au putut încărca locațiile");
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchSections();
+    fetchDoctors();
+    fetchLocations();
+  }, [fetchSections, fetchDoctors, fetchLocations]);
 
   const validateForm = () => {
     const errors: Record<string, string> = {};
 
     if (!formData.name.trim()) {
-      errors.name = "Numele secțiunii este obligatoriu";
+      errors.name = "Numele secției este obligatoriu";
     }
 
     if (!formData.locationIds || formData.locationIds.length === 0) {
@@ -111,10 +111,10 @@ export default function SectionsPage() {
     try {
       if (editingSection) {
         await sectionsApi.update(editingSection._id, formData);
-        toast.success("Secțiunea a fost actualizată cu succes");
+        toast.success("Secția a fost actualizată cu succes");
       } else {
         await sectionsApi.create(formData);
-        toast.success("Secțiunea a fost creată cu succes");
+        toast.success("Secția a fost creată cu succes");
       }
 
       setModalOpen(false);
@@ -123,7 +123,7 @@ export default function SectionsPage() {
       fetchSections();
     } catch (error: any) {
       console.error("Error saving section:", error);
-      toast.error(error.response?.data?.error || "Nu s-a putut salva secțiunea");
+      toast.error(error.response?.data?.error || "Nu s-a putut salva secția");
     }
   };
 
@@ -158,7 +158,7 @@ export default function SectionsPage() {
   const handleDelete = async (section: Section) => {
     if (
       !confirm(
-        `Ești sigur că vrei să ștergi secțiunea "${section.name}"? Aceasta va elimina și toți medicii asociați.`
+        `Ești sigur că vrei să ștergi secția "${section.name}"? Aceasta va elimina și toți medicii asociați.`
       )
     ) {
       return;
@@ -166,11 +166,11 @@ export default function SectionsPage() {
 
     try {
       await sectionsApi.delete(section._id);
-      toast.success("Secțiunea a fost ștearsă cu succes");
+      toast.success("Secția a fost ștearsă cu succes");
       fetchSections();
     } catch (error: any) {
       console.error("Error deleting section:", error);
-      toast.error(error.response?.data?.error || "Nu s-a putut șterge secțiunea");
+      toast.error(error.response?.data?.error || "Nu s-a putut șterge secția");
     }
   };
 
@@ -210,13 +210,13 @@ export default function SectionsPage() {
           locationIds: [defaultLocation._id],
         });
       }
-      toast.success("Secțiunile au fost create din departamente cu succes");
+      toast.success("Secțiile au fost create din departamente cu succes");
       fetchSections();
     } catch (error: any) {
       console.error("Error creating sections from departments:", error);
       toast.error(
         error.response?.data?.error ||
-          "Nu s-au putut crea secțiunile din departamente"
+          "Nu s-au putut crea secțiile din departamente"
       );
     }
   };
@@ -479,9 +479,9 @@ export default function SectionsPage() {
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Secțiuni</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Secții</h1>
             <p className="mt-1 text-sm text-gray-500">
-              Gestionează secțiunile medicale și medicii lor
+              Gestionează secțiile medicale și medicii lor
             </p>
           </div>
           <button
@@ -489,7 +489,7 @@ export default function SectionsPage() {
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
           >
             <Plus className="h-4 w-4 mr-2" />
-            Adaugă Secțiune
+            Adaugă Secție
           </button>
         </div>
 
@@ -500,25 +500,25 @@ export default function SectionsPage() {
           onEdit={handleEdit}
           onDelete={handleDelete}
           loading={loading}
-          emptyMessage="Nu s-au găsit secțiuni."
+          emptyMessage="Nu s-au găsit secții."
         />
 
         {/* Modal */}
         <Modal
           isOpen={modalOpen}
           onClose={() => setModalOpen(false)}
-          title={editingSection ? "Editează Secțiune" : "Adaugă Secțiune Nouă"}
+          title={editingSection ? "Editează Secție" : "Adaugă Secție Nouă"}
         >
           <form onSubmit={handleSubmit} className="space-y-4">
             <FormField
-              label="Nume Secțiune"
+              label="Nume Secție"
               name="name"
               type="text"
               value={formData.name}
               onChange={(value) => setFormData({ ...formData, name: value })}
               error={formErrors.name}
               required
-              placeholder="Introdu numele secțiunii"
+              placeholder="Introdu numele secției"
             />
 
             <FormField
@@ -530,7 +530,7 @@ export default function SectionsPage() {
                 setFormData({ ...formData, description: value })
               }
               error={formErrors.description}
-              placeholder="Introdu descrierea secțiunii"
+              placeholder="Introdu descrierea secției"
             />
 
             <div className="space-y-2">

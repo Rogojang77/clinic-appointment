@@ -5,6 +5,8 @@ import { usePathname } from 'next/navigation';
 import { useUserStore } from '@/store/store';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
+import { removeToken } from '@/utils/tokenStorage';
+import api from '@/services/api';
 import {
   LayoutDashboard,
   Users,
@@ -43,20 +45,17 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
 
   const handleLogout = async () => {
     try {
-      const response = await fetch('/api/logout');
-      const data = await response.json();
-      
-      // Clear token from localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('auth_token');
-      }
-      
+      const response = await api.get('/logout');
+      // Clear access token from localStorage (refresh token cleared by server cookie)
+      removeToken();
       clearUser();
-      toast.success(data.message || 'Logged out successfully');
+      toast.success(response.data.message || 'Logged out successfully');
       router.push('/');
     } catch (error) {
-      console.error('Logout error:', error);
-      toast.error('Error logging out');
+      // Even if API call fails, clear local state
+      removeToken();
+      clearUser();
+      router.push('/');
     }
   };
 

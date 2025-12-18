@@ -2,7 +2,7 @@ import bcrypt from "bcrypt";
 import dbConnect from "@/utils/mongodb";
 import { NextRequest, NextResponse } from "next/server";
 import UserModel from "@/models/User";
-import { createJWT } from "@/utils/jwtUtils";
+import { createAccessToken, createRefreshToken } from "@/utils/jwtUtils";
 
 export async function POST(request: NextRequest) {
   await dbConnect();
@@ -35,9 +35,11 @@ export async function POST(request: NextRequest) {
         isAdmin: user.role === 'admin' || false
       }
 
-      const token = await createJWT(tokenData)
+      // Create both access and refresh tokens
+      const accessToken = await createAccessToken(tokenData);
+      const refreshToken = await createRefreshToken(tokenData);
       
-      if (!token) {
+      if (!accessToken || !refreshToken) {
         return NextResponse.json(
           { message: "Token creation failed" },
           { status: 500 }
@@ -52,16 +54,27 @@ export async function POST(request: NextRequest) {
         isAdmin: user.role === 'admin' || false,
       };
   
-      // Return token in response body (client will store in localStorage)
-      return NextResponse.json(
+      // Create response with access token in body
+      const response = NextResponse.json(
         { 
           message: "Login Successfull !", 
           user: userResponse, 
-          token,
-          expiresIn: 7 * 24 * 60 * 60 // 7 days in seconds
+          accessToken, // Return access token in response body
+          expiresIn: 15 * 60 // 15 minutes in seconds
         },
         { status: 200 }
       );
+
+      // Set refresh token in HttpOnly cookie
+      response.cookies.set('refresh_token', refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+        sameSite: 'strict',
+        maxAge: 30 * 24 * 60 * 60, // 30 days
+        path: '/',
+      });
+
+      return response;
     }
     else{
       return NextResponse.json(

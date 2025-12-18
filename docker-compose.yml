@@ -1,15 +1,15 @@
 services:
   newapp:
-    container_name: clinic-appointment-new
-    image: clinic-appointment-new
+    container_name: clinic-appointment-dev
+    image: clinic-appointment-dev
     build:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "4000:3000"   # <-- NEW PORT
+      - "3000:3000"   # <-- NEW PORT
     environment:
-      MONGO_URI: mongodb://moscrm:${MONGO_PASSWORD}@clinic-mongo:27017/clinicdb?authSource=admin
-      NODE_ENV: production
+      MONGO_URI: mongodb://moscrm:ClinicDB%40166091@81.196.46.41:27017/clinicdb_test?authSource=admin
+      NODE_ENV: development
     restart: unless-stopped
     networks:
       - new-app-network

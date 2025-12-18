@@ -84,6 +84,18 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   await dbConnect();
+  
+  let requestData;
+  try {
+    requestData = await request.json();
+  } catch (jsonError) {
+    console.error("Error parsing JSON:", jsonError);
+    return NextResponse.json(
+      { message: "Invalid JSON in request body" },
+      { status: 400 }
+    );
+  }
+  
   const { 
     location, 
     day, 
@@ -98,7 +110,7 @@ export async function POST(request: NextRequest) {
     sectionId,
     doctorId,
     isDefault
-  } = await request.json();
+  } = requestData;
 
   try {
     // Authenticate request
@@ -111,6 +123,21 @@ export async function POST(request: NextRequest) {
     // Get the count of default time slots (with section priority)
     const defaultSlotCount = await countDefaultTimeSlots(location, day, sectionId);
 
+    // Derive doctorName from doctorId if not provided
+    let finalDoctorName = doctorName || '';
+    if (!finalDoctorName && doctorId) {
+      try {
+        const DoctorModel = (await import('@/models/Doctor')).default;
+        const doctor = await DoctorModel.findById(doctorId).select('name');
+        if (doctor) {
+          finalDoctorName = doctor.name || '';
+        }
+      } catch (doctorError) {
+        console.error('Error fetching doctor name:', doctorError);
+        // Continue with empty doctorName if fetch fails
+      }
+    }
+
     // Create new appointment
     // Ensure date is a Date object (handle both string and Date formats)
     const appointmentDate = date instanceof Date ? date : new Date(date);
@@ -121,7 +148,7 @@ export async function POST(request: NextRequest) {
       date: appointmentDate,
       time,
       patientName,
-      doctorName,
+      doctorName: finalDoctorName,
       testType,
       phoneNumber,
       isConfirmed,
@@ -176,7 +203,16 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Parse the request body for updated data
-    const updatedData = await request.json();
+    let updatedData;
+    try {
+      updatedData = await request.json();
+    } catch (jsonError) {
+      console.error("Error parsing JSON:", jsonError);
+      return NextResponse.json(
+        { message: "Invalid JSON in request body" },
+        { status: 400 }
+      );
+    }
 
     // Authenticate request
     const authResult = await requireAuth(request);
@@ -184,6 +220,20 @@ export async function PATCH(request: NextRequest) {
       return authResult; // Return error response if auth failed
     }
     const { payload: decoded } = authResult;
+
+    // If doctorId is being updated but doctorName is not provided, fetch doctorName
+    if (updatedData.doctorId && !updatedData.doctorName) {
+      try {
+        const DoctorModel = (await import('@/models/Doctor')).default;
+        const doctor = await DoctorModel.findById(updatedData.doctorId).select('name');
+        if (doctor) {
+          updatedData.doctorName = doctor.name || '';
+        }
+      } catch (doctorError) {
+        console.error('Error fetching doctor name for update:', doctorError);
+        // Continue without doctorName if fetch fails
+      }
+    }
 
     // Partially update the appointment by ID
     const updatedAppointment = await AppointmentModel.findByIdAndUpdate(

@@ -1,5 +1,7 @@
 "use client";
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+
+export const dynamic = 'force-dynamic';
 import SuperAdminLayout from '@/components/superadmin/SuperAdminLayout';
 import DataTable from '@/components/superadmin/DataTable';
 import Modal from '@/components/superadmin/Modal';
@@ -66,13 +68,7 @@ export default function SectionSchedulesPage() {
 
   const daysOfWeek = ['Luni', 'Marți', 'Miercuri', 'Joi', 'Vineri', 'Sâmbătă', 'Duminica'];
 
-  useEffect(() => {
-    fetchSchedules();
-    fetchSections();
-    fetchLocations();
-  }, []);
-
-  const fetchSchedules = async () => {
+  const fetchSchedules = useCallback(async () => {
     try {
       setLoading(true);
       const response = await api.get('/section-schedules');
@@ -83,9 +79,9 @@ export default function SectionSchedulesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const fetchSections = async () => {
+  const fetchSections = useCallback(async () => {
     try {
       const response = await sectionsApi.getAll();
       setSections(response.data.data);
@@ -93,9 +89,9 @@ export default function SectionSchedulesPage() {
       console.error('Error fetching sections:', error);
       toast.error('Failed to load sections');
     }
-  };
+  }, []);
 
-  const fetchLocations = async () => {
+  const fetchLocations = useCallback(async () => {
     try {
       const response = await locationsApi.getAll();
       setLocations(response.data.data);
@@ -103,7 +99,13 @@ export default function SectionSchedulesPage() {
       console.error('Error fetching locations:', error);
       toast.error('Failed to load locations');
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchSchedules();
+    fetchSections();
+    fetchLocations();
+  }, [fetchSchedules, fetchSections, fetchLocations]);
 
   const validateForm = () => {
     const errors: Record<string, string> = {};

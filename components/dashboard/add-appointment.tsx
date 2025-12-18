@@ -215,7 +215,7 @@ const AppointmentSchema = Yup.object().shape({
   doctorName: Yup.string().optional(),
   sectionId: Yup.string().when('testType', {
     is: (testType: string) => testType && testType !== 'Ecografie',
-    then: (schema) => schema.required("Secțiunea este obligatorie"),
+    then: (schema) => schema.required("Secția este obligatorie"),
     otherwise: (schema) => schema.optional(),
   }),
   doctorId: Yup.string().optional(),
@@ -231,6 +231,7 @@ interface AppointmentAddEditProps {
   data?: Appointment | null;
   fetchAppointments: () => void;
   appointments?: any;
+  selectedTestType?: string | null;
 }
 
 export default function AppointmentAddEdit({
@@ -243,6 +244,7 @@ export default function AppointmentAddEdit({
   data,
   fetchAppointments,
   appointments,
+  selectedTestType,
 }: AppointmentAddEditProps) {
   const [customTime, setCustomTime] = useState("");
   const [selectTime, setSelectTime] = useState({
@@ -261,9 +263,44 @@ export default function AppointmentAddEdit({
   const setFieldValueRef = useRef<((field: string, value: any) => void) | null>(null);
   const lastFetchedLocationRef = useRef<string>(""); // Track last fetched location to prevent duplicate requests
   const isLocationChangeInProgressRef = useRef<boolean>(false); // Track if location change is in progress
+  
+  // Refs for form fields to enable scrolling to invalid inputs
+  const fieldRefs = useRef<{ [key: string]: HTMLElement | null }>({});
 
   const appointmentDate = dayjs(date).startOf("day");
   const formattedDate = appointmentDate.format("YYYY-MM-DD");
+
+  // Function to scroll to the first invalid field
+  const scrollToFirstInvalidField = (errors: any, touched: any) => {
+    const fieldOrder = ['patientName', 'phoneNumber', 'sectionId', 'testType', 'time'];
+    
+    for (const fieldName of fieldOrder) {
+      if (errors[fieldName] && touched[fieldName]) {
+        const fieldElement = fieldRefs.current[fieldName];
+        if (fieldElement) {
+          // Scroll to the field with some offset from top
+          fieldElement.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center' 
+          });
+          // Focus the field for better UX
+          setTimeout(() => {
+            // If it's already an input/select/textarea, focus it directly
+            if (fieldElement instanceof HTMLInputElement || fieldElement instanceof HTMLSelectElement || fieldElement instanceof HTMLTextAreaElement) {
+              fieldElement.focus();
+            } else if (fieldElement instanceof HTMLElement) {
+              // If it's a wrapper div, find the input/select inside it
+              const inputElement = fieldElement.querySelector('input, select, textarea') as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null;
+              if (inputElement) {
+                inputElement.focus();
+              }
+            }
+          }, 300);
+          break;
+        }
+      }
+    }
+  };
 
   const handleAddOrUpdateAppointment = async (
     values: any,
@@ -404,12 +441,12 @@ export default function AppointmentAddEdit({
       setSections(sectionsData);
     } catch (error) {
       console.error("Error fetching sections:", error);
-      toast.error("Nu s-au putut încărca secțiunile");
+      toast.error("Nu s-au putut încărca secțiile");
       setSections([]);
     }
   }, [location, locations]);
 
-  const fetchDoctors = async (sectionId?: string) => {
+  const fetchDoctors = useCallback(async (sectionId?: string) => {
     try {
       const params: { isActive: boolean; sectionId?: string } = { isActive: true };
       if (sectionId) {
@@ -421,9 +458,9 @@ export default function AppointmentAddEdit({
       console.error("Error fetching doctors:", error);
       toast.error("Nu s-au putut încărca medicii");
     }
-  };
+  }, []);
 
-  const fetchLocations = async () => {
+  const fetchLocations = useCallback(async () => {
     try {
       const response = await locationsApi.getAll();
       setLocations(response.data.data);
@@ -436,7 +473,7 @@ export default function AppointmentAddEdit({
         { _id: '2', name: 'Oradea', isActive: true }
       ]);
     }
-  };
+  }, []);
 
   // get the time slots based on section + location + day
   const fetchTimeSlots = useCallback(async (sectionIdFromForm?: string, locationToUse?: string, testTypeToUse?: string) => {
@@ -509,7 +546,7 @@ export default function AppointmentAddEdit({
 
   useEffect(() => {
     fetchLocations();
-  }, []);
+  }, [fetchLocations]);
 
   // Fetch sections when location changes or when locations are loaded
   useEffect(() => {
@@ -528,7 +565,7 @@ export default function AppointmentAddEdit({
   // Fetch doctors when component mounts (will be filtered by section later)
   useEffect(() => {
     fetchDoctors();
-  }, []);
+  }, [fetchDoctors]);
 
   // Initialize selectedSection from existing appointment data when editing
   useEffect(() => {
@@ -540,11 +577,12 @@ export default function AppointmentAddEdit({
       if (sectionIdValue && sectionIdValue !== selectedSection) {
         setSelectedSection(sectionIdValue);
       }
-    } else if (!data && selectedSection && isModalOpen) {
-      // Reset when creating new appointment (only when modal opens)
+    } else if (!data && selectedSection && isModalOpen && !selectedTestType) {
+      // Reset when creating new appointment (only when modal opens and no preselected section)
+      // Don't reset if we have a selectedTestType to prefill
       setSelectedSection("");
     }
-  }, [data?.sectionId, isModalOpen]); // Removed selectedSection from deps to prevent loop
+  }, [data, selectedSection, isModalOpen, selectedTestType]);
 
   // Auto-select Ecografie section when isEco is true and sections are loaded
   useEffect(() => {
@@ -558,6 +596,30 @@ export default function AppointmentAddEdit({
     }
   }, [isEco, data, isModalOpen, sections, selectedSection]);
 
+  // Prefill section from Dashboard selectedTestType when modal opens
+  useEffect(() => {
+    if (selectedTestType && !data && isModalOpen && sections.length > 0 && setFieldValueRef.current) {
+      // Find the section that matches the selectedTestType
+      const matchingSection = sections.find((s: any) => s.name === selectedTestType);
+      if (matchingSection) {
+        // Only set if not already set or if it's different
+        if (!selectedSection || selectedSection !== matchingSection._id) {
+          setSelectedSection(matchingSection._id);
+          setFieldValueRef.current("sectionId", matchingSection._id);
+          setFieldValueRef.current("testType", matchingSection.name);
+          
+          // Fetch doctors for the preselected section
+          fetchDoctors(matchingSection._id);
+          
+          // Fetch time slots for the preselected section and location
+          if (location && day) {
+            fetchTimeSlots(matchingSection._id, location, matchingSection.name);
+          }
+        }
+      }
+    }
+  }, [selectedTestType, data, isModalOpen, sections, selectedSection, location, day, fetchDoctors, fetchTimeSlots]);
+
 
   // Fetch doctors when section changes
   useEffect(() => {
@@ -567,7 +629,7 @@ export default function AppointmentAddEdit({
       // Fetch all doctors when no section is selected
       fetchDoctors();
     }
-  }, [selectedSection]);
+  }, [selectedSection, fetchDoctors]);
 
   // Fetch time slots when section, location, day, or date changes
   // Note: Location changes are handled in the onChange handler to prevent duplicate requests
@@ -631,59 +693,107 @@ export default function AppointmentAddEdit({
                 date: data?.date || formattedDate,
                 time: data?.time || "",
                 patientName: data?.patientName || "",
-                testType: isEco ? "Ecografie" : (data?.testType || data?.section?.name || ""),
+                testType: isEco ? "Ecografie" : (data?.testType || data?.section?.name || selectedTestType || ""),
                 phoneNumber: data?.phoneNumber || "",
                 notes: data?.notes || "",
                 doctorName: isEco ? "-" : (data?.doctorName || data?.doctor?.name || ""),
                 location: data?.location || location,
                 isConfirmed: data?.isConfirmed ?? true,
-                sectionId: data?.sectionId || data?.section?._id || "",
+                sectionId: data?.sectionId || data?.section?._id || (selectedTestType && sections.length > 0 
+                  ? sections.find((s: any) => s.name === selectedTestType)?._id || ""
+                  : ""),
                 doctorId: data?.doctorId || data?.doctor?._id || "",
               }}
               validationSchema={AppointmentSchema}
               onSubmit={handleAddOrUpdateAppointment}
+              validateOnChange={true}
+              validateOnBlur={true}
             >
-              {({ errors, touched, setFieldValue, values }) => {
+              {({ errors, touched, setFieldValue, values, setTouched, setErrors, handleSubmit, validateForm }) => {
                 // Handle section change logic directly in onChange handler instead of useEffect
                 // This prevents infinite loops from useEffect dependencies
                 
                 // Store setFieldValue in ref for use in useEffect
                 setFieldValueRef.current = setFieldValue;
 
+                // Custom submit handler that validates and scrolls to errors
+                const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+                  e.preventDefault();
+                  
+                  // Mark all fields as touched to show errors
+                  const allFields = ['patientName', 'phoneNumber', 'sectionId', 'testType', 'time'];
+                  const touchedFields: any = {};
+                  allFields.forEach(field => {
+                    touchedFields[field] = true;
+                  });
+                  setTouched(touchedFields);
+                  
+                  // Validate the form
+                  const validationErrors = await validateForm();
+                  
+                  // Check if there are any errors
+                  if (validationErrors && Object.keys(validationErrors).length > 0) {
+                    setErrors(validationErrors);
+                    // Scroll to first invalid field
+                    setTimeout(() => {
+                      scrollToFirstInvalidField(validationErrors, touchedFields);
+                    }, 100);
+                    toast.error('Vă rugăm să completați toate câmpurile obligatorii');
+                    return;
+                  }
+                  
+                  // If no errors, proceed with submission
+                  handleSubmit(e as React.FormEvent<HTMLFormElement>);
+                };
+
                 return (
-                <Form className="space-y-4 py-3">
+                <Form className="space-y-4 py-3" onSubmit={handleFormSubmit}>
                   {/* Patient Information Section */}
                   <div className="space-y-3">
                     <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
                       Informații Pacient
                     </h3>
                     <div className="grid grid-cols-2 gap-3">
-                      <div>
+                      <div
+                        ref={(el: HTMLDivElement | null) => {
+                          fieldRefs.current.patientName = el;
+                        }}
+                      >
                         <Label htmlFor="patientName" className="mb-1.5 block text-sm font-medium">
                           Nume Pacient <span className="text-red-500">*</span>
                         </Label>
-                        <Field 
-                          name="patientName" 
-                          as={Input} 
-                          id="patientName"
-                          placeholder="Introduceți numele"
-                          className="w-full"
-                        />
+                        <Field name="patientName">
+                          {({ field, meta }: any) => (
+                            <Input
+                              {...field}
+                              id="patientName"
+                              placeholder="Introduceți numele"
+                              className={`w-full ${meta.error && meta.touched ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                            />
+                          )}
+                        </Field>
                         {errors.patientName && touched.patientName && (
                           <div className="text-red-500 text-sm mt-1">{errors.patientName}</div>
                         )}
                       </div>
-                      <div>
+                      <div
+                        ref={(el: HTMLDivElement | null) => {
+                          fieldRefs.current.phoneNumber = el;
+                        }}
+                      >
                         <Label htmlFor="phoneNumber" className="mb-1.5 block text-sm font-medium">
                           Telefon <span className="text-red-500">*</span>
                         </Label>
-                        <Field 
-                          name="phoneNumber" 
-                          as={Input} 
-                          id="phoneNumber"
-                          placeholder="07XX XXX XXX"
-                          className="w-full"
-                        />
+                        <Field name="phoneNumber">
+                          {({ field, meta }: any) => (
+                            <Input
+                              {...field}
+                              id="phoneNumber"
+                              placeholder="07XX XXX XXX"
+                              className={`w-full ${meta.error && meta.touched ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                            />
+                          )}
+                        </Field>
                         {errors.phoneNumber && touched.phoneNumber && (
                           <div className="text-red-500 text-sm mt-1">{errors.phoneNumber}</div>
                         )}
@@ -694,11 +804,15 @@ export default function AppointmentAddEdit({
                   {/* Section and Doctor Information */}
                   <div className="space-y-3">
                     <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
-                      Secțiune și Medic
+                      Secție și Medic
                     </h3>
-                    <div>
+                    <div
+                      ref={(el: HTMLDivElement | null) => {
+                        fieldRefs.current.sectionId = el;
+                      }}
+                    >
                       <Label htmlFor="sectionId" className="mb-1.5 block text-sm font-medium">
-                        Secțiune <span className="text-red-500">*</span>
+                        Secție <span className="text-red-500">*</span>
                       </Label>
                       <Field
                         as="select"
@@ -723,10 +837,10 @@ export default function AppointmentAddEdit({
                         }}
                         disabled={!location || sections.length === 0}
                         value={values.sectionId}
-                        className="block w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        className={`block w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${errors.sectionId && touched.sectionId ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                       >
                         <option value="">
-                          {!location ? "Selectează mai întâi o locație" : sections.length === 0 ? "Nu există secțiuni pentru această locație" : "Selectează Secțiunea"}
+                          {!location ? "Selectează mai întâi o locație" : sections.length === 0 ? "Nu există secții pentru această locație" : "Selectează Secția"}
                         </option>
                         {sections.map((section: any) => (
                           <option key={section._id} value={section._id}>
@@ -855,7 +969,12 @@ export default function AppointmentAddEdit({
                   </div>
 
                   {/* Time Selection Section */}
-                  <div className="space-y-3">
+                  <div 
+                    className={`space-y-3 ${errors.time && touched.time ? 'ring-2 ring-red-500 rounded-lg p-2' : ''}`}
+                    ref={(el: HTMLDivElement | null) => {
+                      fieldRefs.current.time = el;
+                    }}
+                  >
                     <div>
                       <Label className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-2 block">
                         Selectare Oră <span className="text-red-500">*</span>
@@ -945,7 +1064,7 @@ export default function AppointmentAddEdit({
                               Nu există programare disponibilă
                             </p>
                             <p className="text-xs text-gray-500">
-                              Nu există sloturi disponibile pentru această secțiune și zi.
+                              Nu există sloturi disponibile pentru această secție și zi.
                             </p>
                             {!hasScheduleForDay && (
                               <p className="text-xs mt-3 text-blue-600 font-medium">
@@ -1063,7 +1182,6 @@ export default function AppointmentAddEdit({
                     </Button>
                     <Button
                       type="submit"
-                      disabled={Object.keys(errors).length > 0}
                       className="w-1/2 bg-blue-600 hover:bg-blue-700"
                     >
                       {data ? "Actualizează" : "Adaugă"} Programare

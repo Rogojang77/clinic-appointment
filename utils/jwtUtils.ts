@@ -61,11 +61,11 @@ export async function verifyJWT(token: string): Promise<JWTPayload | null> {
 }
 
 /**
- * Creates a JWT token with the provided payload
+ * Creates a short-lived access JWT token (15 minutes)
  * @param payload - The payload to encode in the token
  * @returns The JWT token string or null if creation fails
  */
-export async function createJWT(payload: Omit<JWTPayload, 'iat' | 'exp'>): Promise<string | null> {
+export async function createAccessToken(payload: Omit<JWTPayload, 'iat' | 'exp'>): Promise<string | null> {
   try {
     if (!payload || !payload.id || !payload.email) {
       throw new Error('Invalid payload: missing required fields');
@@ -74,14 +74,47 @@ export async function createJWT(payload: Omit<JWTPayload, 'iat' | 'exp'>): Promi
     const token = await new SignJWT(payload as Record<string, any>)
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
-      .setExpirationTime('7d')
+      .setExpirationTime('15m') // Short-lived access token
       .sign(secret);
     
     return token;
   } catch (error) {
-    console.error("JWT creation failed:", error);
+    console.error("Access token creation failed:", error);
     return null;
   }
+}
+
+/**
+ * Creates a long-lived refresh JWT token (30 days)
+ * @param payload - The payload to encode in the token
+ * @returns The JWT token string or null if creation fails
+ */
+export async function createRefreshToken(payload: Omit<JWTPayload, 'iat' | 'exp'>): Promise<string | null> {
+  try {
+    if (!payload || !payload.id || !payload.email) {
+      throw new Error('Invalid payload: missing required fields');
+    }
+
+    const token = await new SignJWT(payload as Record<string, any>)
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt()
+      .setExpirationTime('30d') // Long-lived refresh token
+      .sign(secret);
+    
+    return token;
+  } catch (error) {
+    console.error("Refresh token creation failed:", error);
+    return null;
+  }
+}
+
+/**
+ * Legacy function for backward compatibility
+ * Creates a JWT token with the provided payload (defaults to access token)
+ * @deprecated Use createAccessToken or createRefreshToken instead
+ */
+export async function createJWT(payload: Omit<JWTPayload, 'iat' | 'exp'>): Promise<string | null> {
+  return createAccessToken(payload);
 }
 
 /**
@@ -101,7 +134,13 @@ export function isTokenExpiredSync(token: string): boolean {
       return true;
     }
 
-    const payload = JSON.parse(atob(parts[1]));
+    let payload;
+    try {
+      payload = JSON.parse(atob(parts[1]));
+    } catch (parseError) {
+      // Invalid base64 or JSON in token payload
+      return true;
+    }
     const expirationDate = payload.exp;
 
     if (!expirationDate || typeof expirationDate !== 'number') {

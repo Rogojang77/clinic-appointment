@@ -89,7 +89,8 @@ export async function middleware(request: NextRequest) {
   }
 
   // Public API routes that don't require authentication
-  const PUBLIC_API_ROUTES = ["/api/login", "/api/register", "/api/logout"];
+  // Note: /api/auth/refresh uses refresh token cookie, not Authorization header
+  const PUBLIC_API_ROUTES = ["/api/login", "/api/register", "/api/logout", "/api/auth/refresh"];
   const isPublicApiRoute = PUBLIC_API_ROUTES.some(route => path === route || path.startsWith(`${route}/`));
 
   // Handle API routes

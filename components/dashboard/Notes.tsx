@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useCallback } from "react";
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
 import dayjs from "dayjs";
 import toast from "react-hot-toast";
 import { Loader } from "lucide-react";
@@ -12,7 +14,7 @@ interface NotesProps {
   setTextareaContent:any;
 }
 
-const Notes: React.FC<NotesProps> = ({ selectedDate, location,textareaContent,setTextareaContent }) => {
+const Notes = ({ selectedDate, location,textareaContent,setTextareaContent }: NotesProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [noteId, setNoteId] = useState<string | null>(null);
 

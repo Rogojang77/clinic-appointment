@@ -25,8 +25,6 @@ const LocationSchema: Schema = new Schema(
   }
 );
 
-LocationSchema.index({ name: 1 });
-
 const LocationModel = mongoose.models.Location || mongoose.model<ILocation>("Location", LocationSchema);
 export default LocationModel;
 

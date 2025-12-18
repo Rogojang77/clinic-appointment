@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import SuperAdminLayout from '@/components/superadmin/SuperAdminLayout';
 import { dashboardApi, DashboardData } from '@/services/api';
 import toast from 'react-hot-toast';
@@ -19,11 +19,7 @@ export default function SuperAdminDashboard() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
       const response = await dashboardApi.getOverview();
@@ -34,7 +30,11 @@ export default function SuperAdminDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   const StatCard = ({ 
     title, 
@@ -135,7 +135,7 @@ export default function SuperAdminDashboard() {
             subtitle={`${dashboardData.overview.activeUsers} activi`}
           />
           <StatCard
-            title="Total Secțiuni"
+            title="Total Secții"
             value={dashboardData.overview.totalSections}
             icon={Building2}
             color="green"

@@ -220,7 +220,7 @@ const Dashboard = () => {
     } finally {
       setIsLoadingLocations(false);
     }
-  }, []);
+  }, [location]);
 
   useEffect(() => {
     if (location) {
@@ -471,7 +471,7 @@ const Dashboard = () => {
         appointments = {data}
         fetchAppointments={fetchAppointments}
         data={editData ? editData : null}
-
+        selectedTestType={selectedTestType}
       />
     </div>
   );

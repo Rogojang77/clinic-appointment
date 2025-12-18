@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import SuperAdminLayout from '@/components/superadmin/SuperAdminLayout';
 import DataTable from '@/components/superadmin/DataTable';
 import Modal from '@/components/superadmin/Modal';
@@ -22,13 +22,7 @@ export default function DoctorsPage() {
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    fetchDoctors();
-    fetchSections();
-    fetchLocations();
-  }, []);
-
-  const fetchDoctors = async () => {
+  const fetchDoctors = useCallback(async () => {
     try {
       setLoading(true);
       const response = await doctorsApi.getAll();
@@ -39,19 +33,19 @@ export default function DoctorsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const fetchSections = async () => {
+  const fetchSections = useCallback(async () => {
     try {
       const response = await sectionsApi.getAll();
       setSections(response.data.data);
     } catch (error) {
       console.error('Error fetching sections:', error);
-      toast.error('Nu s-au putut încărca secțiunile');
+      toast.error('Nu s-au putut încărca secțiile');
     }
-  };
+  }, []);
 
-  const fetchLocations = async () => {
+  const fetchLocations = useCallback(async () => {
     try {
       const response = await locationsApi.getAll();
       setLocations(response.data.data);
@@ -59,7 +53,13 @@ export default function DoctorsPage() {
       console.error('Error fetching locations:', error);
       toast.error('Nu s-au putut încărca locațiile');
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchDoctors();
+    fetchSections();
+    fetchLocations();
+  }, [fetchDoctors, fetchSections, fetchLocations]);
 
   const validateForm = () => {
     const errors: Record<string, string> = {};
@@ -69,7 +69,7 @@ export default function DoctorsPage() {
     }
 
     if (!formData.sectionId) {
-      errors.sectionId = 'Secțiunea este obligatorie';
+      errors.sectionId = 'Secția este obligatorie';
     }
 
     if (!formData.locationIds || formData.locationIds.length === 0) {
@@ -278,7 +278,7 @@ export default function DoctorsPage() {
             />
 
             <FormField
-              label="Secțiune"
+              label="Secție"
               name="sectionId"
               type="select"
               value={formData.sectionId}

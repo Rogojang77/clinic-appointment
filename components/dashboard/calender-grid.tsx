@@ -1,4 +1,6 @@
-import { useState, useEffect } from "react";
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
 import dayjs from "dayjs";
 import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
 import { getCalendarDays } from "@/utils/getCalenderDays";
@@ -50,11 +52,8 @@ const CalendarGrid = ({
     setSelectedDate(date);
     setDayName(date.format("dddd"));
   };
-  useEffect(() => {
-    // Don't fetch if currentDate is not initialized yet
+  const fetchColors = useCallback(async () => {
     if (!currentDate || !startDate || !endDate) return;
-    
-    const fetchColors = async () => {
       setIsLoading(true);
       try {
         const response = await api.get("/colors", {
@@ -85,10 +84,11 @@ const CalendarGrid = ({
       } finally {
         setIsLoading(false);
       }
-    };
-
-    fetchColors();
   }, [startDate, endDate, location, currentDate]);
+
+  useEffect(() => {
+    fetchColors();
+  }, [fetchColors]);
 
   return (
     <div className="flex flex-col lg:flex-row p-4 lg:space-x-10 w-full justify-between lg:px-10 px-5">

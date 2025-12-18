@@ -29,12 +29,16 @@ const SignIn = () => {
   const handleSubmit = async (values: any) => {
     try {
       setIsLoading(true);
-      const response = await api.post("/login", values);
+      // Use axios directly with withCredentials to ensure cookies are sent/received
+      const response = await api.post("/login", values, {
+        withCredentials: true, // Important: include cookies for refresh token
+      });
       if (response.status === 200) {
-        const { user, token } = response.data;
+        const { user, accessToken } = response.data;
         setUser(user);
-        // Store the token in localStorage
-        setToken(token);
+        // Store the access token in localStorage
+        // Refresh token is automatically stored in HttpOnly cookie by server
+        setToken(accessToken);
         router.push("/dashboard");
         toast.success("Signin Successfully!");
       } else {
