@@ -263,6 +263,9 @@ export default function AppointmentAddEdit({
   const setFieldValueRef = useRef<((field: string, value: any) => void) | null>(null);
   const lastFetchedLocationRef = useRef<string>(""); // Track last fetched location to prevent duplicate requests
   const isLocationChangeInProgressRef = useRef<boolean>(false); // Track if location change is in progress
+  const fetchingDoctorsRef = useRef<Set<string>>(new Set()); // Track in-flight doctor requests by sectionId
+  const fetchingTimeSlotsRef = useRef<Set<string>>(new Set()); // Track in-flight time slot requests by key
+  const hasPrefilledSectionRef = useRef<boolean>(false); // Track if we've already prefilled section from selectedTestType
   
   // Refs for form fields to enable scrolling to invalid inputs
   const fieldRefs = useRef<{ [key: string]: HTMLElement | null }>({});
@@ -447,7 +450,17 @@ export default function AppointmentAddEdit({
   }, [location, locations]);
 
   const fetchDoctors = useCallback(async (sectionId?: string) => {
+    // Create a unique key for this request
+    const requestKey = sectionId || 'all';
+    
+    // Prevent duplicate simultaneous requests
+    if (fetchingDoctorsRef.current.has(requestKey)) {
+      return; // Request already in progress
+    }
+    
     try {
+      fetchingDoctorsRef.current.add(requestKey);
+      
       const params: { isActive: boolean; sectionId?: string } = { isActive: true };
       if (sectionId) {
         params.sectionId = sectionId;
@@ -457,6 +470,8 @@ export default function AppointmentAddEdit({
     } catch (error) {
       console.error("Error fetching doctors:", error);
       toast.error("Nu s-au putut încărca medicii");
+    } finally {
+      fetchingDoctorsRef.current.delete(requestKey);
     }
   }, []);
 
@@ -479,12 +494,21 @@ export default function AppointmentAddEdit({
   const fetchTimeSlots = useCallback(async (sectionIdFromForm?: string, locationToUse?: string, testTypeToUse?: string) => {
     const locationValue = locationToUse || location;
     if (locationValue && day) {
-      // Prevent duplicate requests for the same location
-      const requestKey = `${locationValue}-${day}-${sectionIdFromForm || 'no-section'}-${date?.format("YYYY-MM-DD") || ''}`;
-      if (lastFetchedLocationRef.current === requestKey) {
-        return; // Skip if we're already fetching/fetched for this exact combination
+      // Create a unique key for this request
+      const requestKey = `${locationValue}-${day}-${sectionIdFromForm || selectedSection || 'no-section'}-${date?.format("YYYY-MM-DD") || ''}`;
+      
+      // Prevent duplicate simultaneous requests
+      if (fetchingTimeSlotsRef.current.has(requestKey)) {
+        return; // Request already in progress
       }
+      
+      // Also check if we just fetched the same data
+      if (lastFetchedLocationRef.current === requestKey) {
+        return; // Skip if we already fetched this exact combination
+      }
+      
       lastFetchedLocationRef.current = requestKey;
+      fetchingTimeSlotsRef.current.add(requestKey);
       
       setIsLoadingTimeSlots(true);
       try {
@@ -533,6 +557,7 @@ export default function AppointmentAddEdit({
         setHasScheduleForDay(false);
       } finally {
         setIsLoadingTimeSlots(false);
+        fetchingTimeSlotsRef.current.delete(requestKey);
       }
     } else {
       setTimeSlots([]);
@@ -561,11 +586,6 @@ export default function AppointmentAddEdit({
       fetchSections();
     }
   }, [isModalOpen, location, locations, fetchSections]);
-
-  // Fetch doctors when component mounts (will be filtered by section later)
-  useEffect(() => {
-    fetchDoctors();
-  }, [fetchDoctors]);
 
   // Initialize selectedSection from existing appointment data when editing
   useEffect(() => {
@@ -596,46 +616,48 @@ export default function AppointmentAddEdit({
     }
   }, [isEco, data, isModalOpen, sections, selectedSection]);
 
-  // Prefill section from Dashboard selectedTestType when modal opens
+  // Prefill section from Dashboard selectedTestType when modal opens (only once)
   useEffect(() => {
-    if (selectedTestType && !data && isModalOpen && sections.length > 0 && setFieldValueRef.current) {
+    // Reset the prefill flag when modal closes
+    if (!isModalOpen) {
+      hasPrefilledSectionRef.current = false;
+      return;
+    }
+
+    // Only prefill once when modal opens with a preselected section
+    if (selectedTestType && !data && isModalOpen && sections.length > 0 && setFieldValueRef.current && !hasPrefilledSectionRef.current) {
       // Find the section that matches the selectedTestType
       const matchingSection = sections.find((s: any) => s.name === selectedTestType);
       if (matchingSection) {
-        // Only set if not already set or if it's different
-        if (!selectedSection || selectedSection !== matchingSection._id) {
-          setSelectedSection(matchingSection._id);
-          setFieldValueRef.current("sectionId", matchingSection._id);
-          setFieldValueRef.current("testType", matchingSection.name);
-          
-          // Fetch doctors for the preselected section
-          fetchDoctors(matchingSection._id);
-          
-          // Fetch time slots for the preselected section and location
-          if (location && day) {
-            fetchTimeSlots(matchingSection._id, location, matchingSection.name);
-          }
-        }
+        setSelectedSection(matchingSection._id);
+        setFieldValueRef.current("sectionId", matchingSection._id);
+        setFieldValueRef.current("testType", matchingSection.name);
+        hasPrefilledSectionRef.current = true; // Mark as prefilled so we don't reset it
+        
+        // Note: fetchDoctors and fetchTimeSlots will be triggered by the useEffect hooks
+        // that watch selectedSection, location, day, etc., so we don't need to call them here
       }
     }
-  }, [selectedTestType, data, isModalOpen, sections, selectedSection, location, day, fetchDoctors, fetchTimeSlots]);
+  }, [selectedTestType, data, isModalOpen, sections]);
 
 
-  // Fetch doctors when section changes
+  // Fetch doctors when section changes (only when modal is open to avoid unnecessary requests)
   useEffect(() => {
-    if (selectedSection) {
-      fetchDoctors(selectedSection);
-    } else {
-      // Fetch all doctors when no section is selected
-      fetchDoctors();
+    if (isModalOpen) {
+      if (selectedSection) {
+        fetchDoctors(selectedSection);
+      } else {
+        // Fetch all doctors when no section is selected
+        fetchDoctors();
+      }
     }
-  }, [selectedSection, fetchDoctors]);
+  }, [selectedSection, isModalOpen, fetchDoctors]);
 
-  // Fetch time slots when section, location, day, or date changes
+  // Fetch time slots when section, location, day, or date changes (only when modal is open)
   // Note: Location changes are handled in the onChange handler to prevent duplicate requests
   useEffect(() => {
-    // Skip if location change is in progress (handled by onChange handler)
-    if (isLocationChangeInProgressRef.current) {
+    // Skip if location change is in progress (handled by onChange handler) or modal is closed
+    if (isLocationChangeInProgressRef.current || !isModalOpen) {
       return;
     }
     
@@ -647,7 +669,7 @@ export default function AppointmentAddEdit({
         fetchTimeSlots(selectedSection || undefined, location);
       }
     }
-  }, [selectedSection, location, day, date, fetchTimeSlots]);
+  }, [selectedSection, location, day, date, isModalOpen, fetchTimeSlots]);
 
   // Initialize customTime and showTimeSelector when editing existing appointment
   useEffect(() => {

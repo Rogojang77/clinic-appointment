@@ -4,10 +4,12 @@ import { CustomBold, CustomRegular } from "./custome_fonts";
 
 export const generatePDF = ({
   data = [],
-  location = "Unknown Location",
-  day = "Unknown Day",
-  date = "Unknown Date",
-  notes = "No additional notes provided.",
+  location = "Locatie necunoscuta",
+  day = "Zi necunoscuta",
+  date = "Data necunoscuta",
+  section = "Sectiune necunoscuta",
+  notes = "Nu sunt note suplimentare.",
+  sectionName = "Nume sectiune necunoscut",
 }) => {
   const doc = new jsPDF();
 
@@ -35,7 +37,7 @@ export const generatePDF = ({
   // Add title
   doc.setFontSize(14);
   doc.setTextColor(40, 40, 100);
-  doc.text(`Appointments List for ${location} - ${day}, ${date}`, 12, 33);
+  doc.text(`Lista programari pentru ${location} - ${day}, ${date}, ${sectionName}`, 12, 33);
 
   // Sort data by time in ascending order
   const sortedData = data.sort((a, b) => {
@@ -46,13 +48,13 @@ export const generatePDF = ({
 
   // Prepare table data
   const tableColumns = [
-    "Time prezent",
+    "Ora",
     "Nume",
     "Prenume",
-    "Department",
+    "Secție",
     "Telefon",
     "Doctor",
-    "Notes",
+    "Note",
   ];
   const tableRows = sortedData.map((appointment) => [
     appointment.time || "",
@@ -80,11 +82,11 @@ export const generatePDF = ({
 
   doc.setFont("Roboto", "normal");
   doc.setFontSize(12);
-  doc.text("Notes:", pageMargin, finalY + 10);
+  doc.text("Note:", pageMargin, finalY + 10);
 
-  const notesText = notes || "No additional notes provided.";
+  const notesText = notes || "Nu sunt note.";
   doc.text(notesText, pageMargin, finalY + 20, { maxWidth });
 
   // Save the PDF
-  doc.save("appointments.pdf");
+  doc.save(`programari_${day}_${date}.pdf`);
 };

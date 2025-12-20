@@ -16,8 +16,10 @@ export async function GET(request: NextRequest) {
     const date = searchParams.get("date");
     const location = searchParams.get("location");
     const testType = searchParams.get("testType");
+    const sectionId = searchParams.get("sectionId");
     const doctorName = searchParams.get("doctorName");
   
+ 
     try {
       // Authenticate request
       const authResult = await requireAuth(request);
@@ -26,15 +28,66 @@ export async function GET(request: NextRequest) {
       }
       const { payload: decoded } = authResult;
   
+      // Get total count of appointments in database for comparison
+      const totalAppointmentsCount = await AppointmentModel.countDocuments({});
+  
       // Build filter criteria
       const filter: any = {};
-      if (date) filter.date = new Date(date);
+      // Date comparison: normalize to start of day for accurate comparison
+      // Parse date string (YYYY-MM-DD) and create date range for the entire day
+      // Use local timezone to avoid UTC conversion issues
+      if (date) {
+        const [year, month, day] = date.split('-').map(Number);
+        const startOfDay = new Date(year, month - 1, day, 0, 0, 0, 0); // Local timezone
+        const endOfDay = new Date(year, month - 1, day, 23, 59, 59, 999); // Local timezone
+        filter.date = {
+          $gte: startOfDay,
+          $lte: endOfDay,
+        };
+      }
       if (location) filter.location = location;
-      if (testType) filter.testType = testType;
-      if (doctorName) {
-        filter.$or = [
-          { patientName: doctorName }
-        ];
+      
+      // Handle sectionId and testType filters
+      // When both are provided, filter by sectionId OR testType to catch all relevant appointments
+      // This ensures we catch appointments that might have testType but not sectionId set (backward compatibility)
+      if (sectionId && testType) {
+        // When both are provided, use $or to match either sectionId OR testType
+        const sectionOrTestTypeFilter = {
+          $or: [
+            { sectionId: sectionId },
+            { testType: testType }
+          ]
+        };
+        
+        // If doctorName is also provided, we need to combine filters using $and
+        if (doctorName) {
+          filter.$and = [
+            sectionOrTestTypeFilter,
+            { $or: [{ patientName: doctorName }] }
+          ];
+        } else {
+          filter.$or = sectionOrTestTypeFilter.$or;
+        }
+      } else if (sectionId) {
+        filter.sectionId = sectionId;
+        if (doctorName) {
+          filter.$or = [{ patientName: doctorName }];
+        }
+      } else if (testType) {
+        filter.testType = testType;
+        if (doctorName) {
+          filter.$or = [{ patientName: doctorName }];
+        }
+      } else if (doctorName) {
+        filter.$or = [{ patientName: doctorName }];
+      }
+  
+      
+      // Debug: Count appointments matching filter without date (to see if date is the issue)
+      const filterWithoutDate = { ...filter };
+      delete filterWithoutDate.date;
+      if (Object.keys(filterWithoutDate).length > 0) {
+        const countWithoutDate = await AppointmentModel.countDocuments(filterWithoutDate);
       }
   
       // Fetch filtered appointments with populated section and doctor data
@@ -42,7 +95,7 @@ export async function GET(request: NextRequest) {
       
       // Manually populate section and doctor data
       const populatedAppointments = await Promise.all(
-        appointments.map(async (appointment) => {
+        appointments.map(async (appointment, index) => {
           const appointmentObj = appointment.toObject();
           
           // Populate section data if sectionId exists
@@ -52,8 +105,9 @@ export async function GET(request: NextRequest) {
                 .select('name description');
               if (section) {
                 appointmentObj.section = section.toObject();
-              }
+              } 
             } catch (sectionError) {
+              console.error(`[GET /appointments] Error populating section for sectionId ${appointmentObj.sectionId}:`, sectionError);
               // Silently skip if section cannot be populated
             }
           }
@@ -65,8 +119,9 @@ export async function GET(request: NextRequest) {
                 .select('name email specialization');
               if (doctor) {
                 appointmentObj.doctor = doctor.toObject();
-              }
+              } 
             } catch (doctorError) {
+              console.error(`[GET /appointments] Error populating doctor for doctorId ${appointmentObj.doctorId}:`, doctorError);
               // Silently skip if doctor cannot be populated
             }
           }
@@ -75,6 +130,7 @@ export async function GET(request: NextRequest) {
         })
       );
       
+     
       return NextResponse.json({ success: true, data: populatedAppointments }, { status: 200 });
     } catch (err) {
       console.error("Error fetching appointments:", err);

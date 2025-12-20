@@ -8,12 +8,9 @@ import AppointmentAddEdit from "./add-appointment";
 import dayjs from "dayjs";
 import { dayNameMap } from "@/lib/dayNameMap";
 import Spinner from "../common/loader";
-import EcoTable from "../common/EcoTable";
 import Notes from "./Notes";
-import { useTimeSlotStore } from "@/store/timeStore";
 import { fetchAppointmentsAPI } from "@/service/appointmentService";
 import { handleDownloadPDF, TestTypeSelectedRefresh } from "@/service/actionService";
-import { fetchTimeSlotsAPI } from "@/service/scheduleService";
 import AddAppointmentButton from "./AddButton";
 import { sectionsApi, locationsApi, Section, Location } from "@/services/api";
 
@@ -30,17 +27,14 @@ const Dashboard = () => {
   }, [selectedDate]);
   const [editData, setEditData] = useState<any>(null);
   const [data, setAppointments] = useState<any>(null);
-  const [selectedTestType, setSelectedTestType] = useState<string | null>(null);
+  const [selectedTestType, setSelectedTestType] = useState<string | null>("Ecografie");
   const [textareaContent, setTextareaContent] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingLocations, setIsLoadingLocations] = useState(true);
   const [isLoadingSections, setIsLoadingSections] = useState(false);
-  const [isLoadingTimeSlots, setIsLoadingTimeSlots] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [sections, setSections] = useState<Section[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
-  
-  const { setTimeSlots, timeSlots } = useTimeSlotStore();
 
 
   // Map the Normal Day with Romania Day name ...
@@ -51,11 +45,33 @@ const Dashboard = () => {
   const fetchAppointments = useCallback(async () => {
     try {
       setIsLoading(true);
-      const filters = {
+      // Default to "Ecografie" if no section is selected
+      const testType = selectedTestType || "Ecografie";
+      
+      // Find the sectionId from the selected testType (section name)
+      let sectionId: string | undefined;
+      if (testType && sections.length > 0) {
+        const selectedSection = sections.find((section: any) => section.name === testType);
+        if (selectedSection) {
+          const sectionIdValue = selectedSection._id;
+          if (sectionIdValue) {
+            sectionId = typeof sectionIdValue === 'string' 
+              ? sectionIdValue 
+              : String(sectionIdValue);
+          }
+        }
+      }
+      
+      const filters: any = {
         date: selectedDate ? selectedDate.format("YYYY-MM-DD") : undefined,
         location,
-        testType: selectedTestType,
+        testType: testType,
       };
+      
+      // Add sectionId if found, which will take priority over testType in the API
+      if (sectionId) {
+        filters.sectionId = sectionId;
+      }
 
       // Make GET request with filters
       const data = await fetchAppointmentsAPI(filters);
@@ -65,7 +81,7 @@ const Dashboard = () => {
       console.error("Error fetching appointments:", error);
       setIsLoading(false);
     }
-  }, [selectedDate, location, selectedTestType]);
+  }, [selectedDate, location, selectedTestType, sections]);
 
   // Fetch sections from database based on selected location
   const fetchSections = useCallback(async () => {
@@ -223,12 +239,6 @@ const Dashboard = () => {
   }, [location]);
 
   useEffect(() => {
-    if (location) {
-      fetchAppointments();
-    }
-  }, [selectedDate, location, selectedTestType, fetchAppointments]);
-
-  useEffect(() => {
     fetchLocations();
   }, [fetchLocations]);
 
@@ -239,36 +249,22 @@ const Dashboard = () => {
     }
   }, [location, locations, fetchSections]);
 
-  // According to Location and Day Name Get the timeSlots....
-  const fetchTimeSlots = useCallback(async () => {
-    if (location && selectDay) {
-      try {
-        setIsLoadingTimeSlots(true);
-        const slots = await fetchTimeSlotsAPI(location, selectDay,selectedDate?.format("YYYY-MM-DD"));
-        setTimeSlots(slots);
-      } catch (error) {
-        console.error("Error fetching time slots:", error);
-        setTimeSlots([]);
-      } finally {
-        setIsLoadingTimeSlots(false);
-      }
-    } else {
-      setTimeSlots([]);
-    }
-  }, [location, selectDay, selectedDate, setTimeSlots]);
-
-  // For EcoTable Fetch The Time Slot Initiallly when select Ecografie Tab ...
+  // Fetch appointments when dependencies change (only when sections are loaded to get sectionId)
   useEffect(() => {
-    if (selectedTestType === "Ecografie" && selectedDate) {
-      fetchTimeSlots();
+    if (location && sections.length > 0) {
+      fetchAppointments();
     }
-  }, [location, selectDay, selectedTestType, selectedDate, data, fetchTimeSlots]);
+  }, [selectedDate, location, selectedTestType, sections, fetchAppointments]);
+
+
 
 
   // Handle The Tab Selection ...
   const handleTestTypeSelection = (testType: string | null) => {
-    setSelectedTestType(testType);
-    TestTypeSelectedRefresh(testType);
+    // Default to "Ecografie" if null is passed
+    const finalTestType = testType || "Ecografie";
+    setSelectedTestType(finalTestType);
+    TestTypeSelectedRefresh(finalTestType);
   };
 
   // Persist selectedTestType in local storage
@@ -276,6 +272,9 @@ const Dashboard = () => {
     const savedTestType = localStorage.getItem("selectedTestType");
     if (savedTestType) {
       setSelectedTestType(savedTestType);
+    } else {
+      // Default to "Ecografie" if nothing is saved
+      setSelectedTestType("Ecografie");
     }
   }, []);
 
@@ -335,16 +334,6 @@ const Dashboard = () => {
           </div>
         ) : (
           <div className="w-full flex justify-start mb-3 gap-3">
-          <div
-            className={`cursor-pointer flex justify-center items-center px-4 py-1 text-white text-[15px] font-medium rounded-md text-center ${
-              selectedTestType === null
-                ? "bg-green-500"
-                : "bg-indigo-500 hover:bg-green-500"
-            }`}
-            onClick={() => handleTestTypeSelection(null)}
-          >
-            Toate
-          </div>
           {sections?.find((section: any) => section.name === "Ecografie") && (
             <div
               className={`cursor-pointer flex justify-center items-center py-1 text-white px-4 text-[15px] font-medium rounded-md text-center ${
@@ -412,6 +401,7 @@ const Dashboard = () => {
               handleDownloadPDF(
                 data,
                 location,
+                selectedTestType || "Sectiune necunoscuta",
                 selectDay,
                 selectedDate,
                 textareaContent
@@ -426,32 +416,12 @@ const Dashboard = () => {
             <Spinner />
           </div>
         ) : (
-          <>
-            {selectedTestType === "Ecografie" ? (
-              <div>
-                {isLoadingTimeSlots ? (
-                  <div className="py-5 bg-white rounded-md flex justify-center items-center min-h-[200px]">
-                    <Spinner />
-                  </div>
-                ) : (
-                  <EcoTable
-                    timeSlots={timeSlots}
-                    appointments={data || []}
-                    onView={handleView}
-                    onEdit={handleEdit}
-                    fetchData={fetchAppointments}
-                  />
-                )}
-              </div>
-            ) : (
-              <TableComponent
-                appointments={data || []}
-                onView={handleView}
-                onEdit={handleEdit}
-                fetchData={fetchAppointments}
-              />
-            )}
-          </>
+          <TableComponent
+            appointments={data || []}
+            onView={handleView}
+            onEdit={handleEdit}
+            fetchData={fetchAppointments}
+          />
         )}
 
         <Notes
@@ -464,14 +434,14 @@ const Dashboard = () => {
       <AppointmentAddEdit
         isModalOpen={isModalOpen}
         handleModal={handleModal}
-        isEco={selectedTestType === "Ecografie"}
+        isEco={(selectedTestType || "Ecografie") === "Ecografie"}
         date={selectedDate}
         day = {selectDay}
         location={location}
         appointments = {data}
         fetchAppointments={fetchAppointments}
         data={editData ? editData : null}
-        selectedTestType={selectedTestType}
+        selectedTestType={selectedTestType || "Ecografie"}
       />
     </div>
   );
