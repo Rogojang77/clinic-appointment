@@ -11,6 +11,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"; // Adjust the import path based on your structure
 import { Button } from "@/components/ui/button"; // Adjust the import path
+import { Switch } from "@/components/ui/switch";
 import toast from "react-hot-toast";
 import api from "@/services/api";
 import isDateValid from "@/utils/isValidDate";
@@ -135,6 +136,23 @@ const TableComponent: React.FC<TableComponentProps> = ({
     }
   };
 
+  const handleToggleConfirmed = async (appointment: Appointment, checked: boolean) => {
+    try {
+      await api.patch(`/appointments?id=${appointment._id}`, {
+        isConfirmed: checked,
+      });
+      toast.success(
+        checked
+          ? "Programarea a fost confirmată!"
+          : "Confirmarea programării a fost anulată!"
+      );
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      toast.error("Ceva nu a mers bine!");
+    }
+  };
+
   const renderTable = (appointmentsToRender: Appointment[], title?: string) => {
     const sortedData = sortData(appointmentsToRender);
 
@@ -192,7 +210,7 @@ const TableComponent: React.FC<TableComponentProps> = ({
                     } transition-colors`}
                   >
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
+                      <div className="flex items-center space-x-2">
                         <button
                           onClick={() => onEdit(appointment)}
                           className={`${
@@ -217,6 +235,13 @@ const TableComponent: React.FC<TableComponentProps> = ({
                         >
                           <Trash className="h-4 w-4" />
                         </button>
+                        <Switch
+                          checked={appointment.isConfirmed}
+                          onCheckedChange={(checked) =>
+                            handleToggleConfirmed(appointment, checked)
+                          }
+                          title={appointment.isConfirmed ? "Confirmat" : "Neconfirmat"}
+                        />
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">

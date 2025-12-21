@@ -43,7 +43,7 @@ RUN chmod +x /app/backup.sh /app/start.sh
 # Set environment variable for production
 ENV NODE_ENV=production
 
-# Expose port 3000
+# Expose port 3000 (external access restricted via docker-compose port binding to 127.0.0.1)
 EXPOSE 3000
 
 # Start the application

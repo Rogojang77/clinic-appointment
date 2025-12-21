@@ -91,7 +91,8 @@ export async function GET(request: NextRequest) {
       }
   
       // Fetch filtered appointments with populated section and doctor data
-      const appointments = await AppointmentModel.find(filter).sort({ date: 1 });
+      // Sort by date first, then by time (timeslot) to ensure chronological order
+      const appointments = await AppointmentModel.find(filter).sort({ date: 1, time: 1 });
       
       // Manually populate section and doctor data
       const populatedAppointments = await Promise.all(

@@ -34,8 +34,3 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-
-
-sync database from live to test: 
-
-mongodump --uri="mongodb://moscrm:ClinicDB%40166091@81.196.46.41:27017/clinicdb?authSource=admin" --out=/tmp/mongo_sync && mongorestore --uri="mongodb://moscrm:ClinicDB%40166091@81.196.46.41:27017/clinicdb_test?authSource=admin" --drop /tmp/mongo_sync/clinicdb && rm -rf /tmp/mongo_sync
