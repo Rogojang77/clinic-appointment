@@ -421,6 +421,7 @@ const Dashboard = () => {
             onView={handleView}
             onEdit={handleEdit}
             fetchData={fetchAppointments}
+            selectedTestType={selectedTestType}
           />
         )}
 

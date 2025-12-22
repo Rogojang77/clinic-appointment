@@ -47,6 +47,7 @@ interface TableComponentProps {
   onView: (appointment: Appointment) => void;
   onEdit: (appointment: Appointment) => void;
   fetchData: () => void;
+  selectedTestType?: string | null;
 }
 
 const TableComponent: React.FC<TableComponentProps> = ({
@@ -54,6 +55,7 @@ const TableComponent: React.FC<TableComponentProps> = ({
   onView,
   onEdit,
   fetchData,
+  selectedTestType,
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -160,6 +162,8 @@ const TableComponent: React.FC<TableComponentProps> = ({
       return null;
     }
 
+    const isEcografie = selectedTestType === "Ecografie";
+
     const SortableHeader = ({ field, label }: { field: string; label: string }) => (
       <th
         className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100`}
@@ -193,10 +197,18 @@ const TableComponent: React.FC<TableComponentProps> = ({
                   </th>
                   <SortableHeader field="time" label="Ora" />
                   <SortableHeader field="patientName" label="Nume" />
-                  <SortableHeader field="section" label="Secție" />
+                  {isEcografie ? (
+                    <SortableHeader field="notes" label="Observații" />
+                  ) : (
+                    <SortableHeader field="section" label="Secție" />
+                  )}
                   <SortableHeader field="phoneNumber" label="Telefon" />
                   <SortableHeader field="doctor" label="Doctor" />
-                  <SortableHeader field="notes" label="Observații" />
+                  {isEcografie ? (
+                    <SortableHeader field="section" label="Secție" />
+                  ) : (
+                    <SortableHeader field="notes" label="Observații" />
+                  )}
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -250,18 +262,30 @@ const TableComponent: React.FC<TableComponentProps> = ({
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {appointment.patientName}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {appointment.section?.name || appointment.testType || "-"}
-                    </td>
+                    {isEcografie ? (
+                      <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate" title={appointment.notes || "-"}>
+                        {appointment.notes || "-"}
+                      </td>
+                    ) : (
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {appointment.section?.name || appointment.testType || "-"}
+                      </td>
+                    )}
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {appointment.phoneNumber}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {appointment.doctor?.name || appointment.doctorName || "-"}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate" title={appointment.notes || "-"}>
-                      {appointment.notes || "-"}
-                    </td>
+                    {isEcografie ? (
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {appointment.section?.name || appointment.testType || "-"}
+                      </td>
+                    ) : (
+                      <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate" title={appointment.notes || "-"}>
+                        {appointment.notes || "-"}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
