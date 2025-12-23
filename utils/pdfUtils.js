@@ -1,5 +1,5 @@
-import jsPDF from "jspdf";
-import "jspdf-autotable";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import { CustomBold, CustomRegular } from "./custome_fonts";
 
 export const generatePDF = ({
@@ -67,7 +67,7 @@ export const generatePDF = ({
   ]);
 
   // Add the table
-  doc.autoTable({
+  autoTable(doc, {
     head: [tableColumns],
     body: tableRows,
     startY: 40,
