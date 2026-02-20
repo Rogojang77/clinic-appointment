@@ -1,10 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  env: {
-    MONGO_URI: process.env.MONGO_URI,
-    SECRET: process.env.SECRET,
-  },
+  // Do NOT inline MONGO_URI/SECRET here - they are runtime-only (set by Docker)
+  // Inlining would bake build-time values (undefined) into the bundle
+  env: {},
 };
 
 export default nextConfig;

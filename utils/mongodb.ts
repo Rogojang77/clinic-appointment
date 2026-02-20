@@ -24,7 +24,7 @@ async function dbConnect(): Promise<typeof mongoose> {
     cachedPromise = mongoose.connect(MONGO_URI as string, {
         bufferCommands: false, // Disable mongoose buffering
         maxPoolSize: 10, // Maintain up to 10 socket connections
-        serverSelectionTimeoutMS: 5000, // Keep trying to send operations for 5 seconds
+        serverSelectionTimeoutMS: 20000, // 20s for Docker cold start
         socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
     }).then((mongoose) => {
         if (process.env.NODE_ENV !== 'production') {

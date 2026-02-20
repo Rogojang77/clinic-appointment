@@ -5,7 +5,15 @@ import UserModel from "@/models/User";
 import { createAccessToken, createRefreshToken } from "@/utils/jwtUtils";
 
 export async function POST(request: NextRequest) {
-  await dbConnect();
+  try {
+    await dbConnect();
+  } catch (err) {
+    console.error("DB connection error:", err);
+    return NextResponse.json(
+      { message: "Database unavailable. Please try again later." },
+      { status: 503 }
+    );
+  }
   const { email, password } = await request.json();
 
   try {
