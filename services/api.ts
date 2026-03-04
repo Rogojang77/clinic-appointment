@@ -223,6 +223,7 @@ export interface Doctor {
   sectionId: string | { _id: string; name: string; description?: string };
   schedule: DailySchedule[];
   isActive: boolean;
+  userId?: string; // Link to User account when doctor has login
   createdAt: string;
   updatedAt: string;
   section?: Section;
@@ -398,6 +399,9 @@ export const doctorsApi = {
     const queryParams = isActive !== undefined ? `?isActive=${isActive}` : '';
     return api.get<{ success: boolean; data: Doctor[] }>(`/doctors/section/${sectionId}${queryParams}`);
   },
+
+  createAccount: (doctorId: string, data: { email: string; username: string; password: string }) =>
+    api.post<{ success: boolean; data: unknown; message: string }>(`/doctors/${doctorId}/create-account`, data),
 };
 
 // Locations API
@@ -416,6 +420,42 @@ export interface Location {
 export const dashboardApi = {
   getOverview: () => 
     api.get<{ success: boolean; data: DashboardData }>('/dashboard'),
+};
+
+// Medical files API
+export interface MedicalFileDto {
+  _id: string;
+  appointmentId: string;
+  doctorId: string;
+  diagnosis: string;
+  prescription: string;
+  clinicalNotes: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export const medicalFilesApi = {
+  getByAppointment: (appointmentId: string) =>
+    api.get<{ success: boolean; data: MedicalFileDto[] }>(`/medical-files?appointmentId=${encodeURIComponent(appointmentId)}`),
+  getById: (id: string) =>
+    api.get<{ success: boolean; data: MedicalFileDto }>(`/medical-files/${id}`),
+  create: (data: { appointmentId: string; diagnosis?: string; prescription?: string; clinicalNotes?: string }) =>
+    api.post<{ success: boolean; data: MedicalFileDto }>('/medical-files', data),
+  update: (id: string, data: { diagnosis?: string; prescription?: string; clinicalNotes?: string }) =>
+    api.patch<{ success: boolean; data: MedicalFileDto }>(`/medical-files/${id}`, data),
+  getPdfUrl: (id: string) => `/api/medical-files/${id}/pdf`,
+  downloadPdf: async (id: string, filename?: string) => {
+    const response = await api.get<Blob>(`/medical-files/${id}/pdf`, {
+      responseType: 'blob',
+    });
+    const blob = response.data;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename || `fisa-medicala-${id}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
 };
 
 export default api;

@@ -15,11 +15,17 @@ export default function RootLayout({
 }) {
   
   return (
-    <html lang="en">
+    <html lang="ro">
       <body
         className={` antialiased`}
       >
-        <Toaster position="top-center" />
+        <Toaster
+          position="top-center"
+          toastOptions={{
+            ariaProps: { role: "status", "aria-live": "polite" },
+            error: { ariaProps: { role: "alert", "aria-live": "assertive" } },
+          }}
+        />
         <Navbar />
         {children}
       </body>

@@ -303,7 +303,7 @@ const TableComponent: React.FC<TableComponentProps> = ({
       ) : (
         <div className="bg-white shadow rounded-lg">
           <div className="px-4 py-5 sm:p-6 text-center">
-            <p className="text-gray-500 font-medium text-lg">Nicio Rezervare!</p>
+            <p className="text-gray-500 font-medium text-lg">Nicio programare pentru această dată/locație.</p>
           </div>
         </div>
       )}

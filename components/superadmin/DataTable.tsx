@@ -15,12 +15,21 @@ interface Column {
   sortable?: boolean;
 }
 
+export interface ExtraAction {
+  key: string;
+  label: string;
+  icon: React.ReactNode;
+  onClick: (row: any) => void;
+  visible?: (row: any) => boolean;
+}
+
 interface DataTableProps {
   data: any[];
   columns: Column[];
   onEdit?: (row: any) => void;
   onDelete?: (row: any) => void;
   onView?: (row: any) => void;
+  extraActions?: ExtraAction[];
   loading?: boolean;
   emptyMessage?: string;
 }
@@ -31,6 +40,7 @@ export default function DataTable({
   onEdit,
   onDelete,
   onView,
+  extraActions = [],
   loading = false,
   emptyMessage = 'No data available'
 }: DataTableProps) {
@@ -114,7 +124,7 @@ export default function DataTable({
                   </div>
                 </th>
               ))}
-              {(onEdit || onDelete || onView) && (
+              {(onEdit || onDelete || onView || extraActions.length > 0) && (
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
@@ -132,7 +142,7 @@ export default function DataTable({
                     }
                   </td>
                 ))}
-                {(onEdit || onDelete || onView) && (
+                {(onEdit || onDelete || onView || extraActions.length > 0) && (
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex space-x-2">
                       {onView && (
@@ -153,6 +163,19 @@ export default function DataTable({
                           <Pencil className="h-4 w-4" />
                         </button>
                       )}
+                      {extraActions.map((action) => {
+                        if (action.visible && !action.visible(row)) return null;
+                        return (
+                          <button
+                            key={action.key}
+                            onClick={() => action.onClick(row)}
+                            className="text-green-600 hover:text-green-900"
+                            title={action.label}
+                          >
+                            {action.icon}
+                          </button>
+                        );
+                      })}
                       {onDelete && (
                         <button
                           onClick={() => onDelete(row)}

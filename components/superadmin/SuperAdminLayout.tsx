@@ -7,6 +7,8 @@ import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { removeToken } from '@/utils/tokenStorage';
 import api from '@/services/api';
+import { useAuthEffect } from '@/hook/useAuthEffect';
+import { copy } from '@/lib/copy';
 import {
   LayoutDashboard,
   Users,
@@ -22,6 +24,8 @@ interface SuperAdminLayoutProps {
 }
 
 export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
+  useAuthEffect();
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
   const user = useUserStore((state) => state.user);
@@ -32,13 +36,13 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
   useEffect(() => {
     if (!user) {
       router.push('/');
-      toast.error('Please login first');
+      toast.error(copy.pleaseLogin);
       return;
     }
 
     if (user.role !== 'admin' || !user.isAdmin) {
       router.push('/dashboard');
-      toast.error('Access denied. SuperAdmin privileges required.');
+      toast.error(copy.accessDenied);
       return;
     }
   }, [user, router]);
@@ -49,7 +53,7 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
       // Clear access token from localStorage (refresh token cleared by server cookie)
       removeToken();
       clearUser();
-      toast.success(response.data.message || 'Logged out successfully');
+      toast.success(response.data.message || copy.loggedOut);
       router.push('/');
     } catch (error) {
       // Even if API call fails, clear local state
@@ -91,7 +95,7 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Checking permissions...</p>
+          <p className="mt-4 text-gray-600">{copy.checkingPermissions}</p>
         </div>
       </div>
     );
@@ -201,7 +205,7 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
               className="mt-3 flex w-full items-center px-2 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-md"
             >
               <LogOut className="mr-3 h-5 w-5" />
-              Sign out
+              {copy.signOut}
             </button>
           </div>
         </div>

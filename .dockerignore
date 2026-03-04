@@ -1,0 +1,13 @@
+node_modules
+.next
+out
+.git
+.env
+.env.*
+mongo-backups
+*.log
+.idea
+.vscode
+.dockerignore
+Dockerfile
+docker-compose*.yml

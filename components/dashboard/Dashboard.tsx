@@ -1,11 +1,26 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useAuthEffect } from "@/hook/useAuthEffect";
 
 import TableComponent from "../common/table-component";
 import CalendarGrid from "./calender-grid";
 import AppointmentAddEdit from "./add-appointment";
+import ViewAppointment from "./view-appointment";
 import dayjs from "dayjs";
+import { useRouter } from "next/navigation";
+import api from "@/services/api";
+import toast from "react-hot-toast";
+import isDateValid from "@/utils/isValidDate";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Loader } from "lucide-react";
 import { dayNameMap } from "@/lib/dayNameMap";
 import Spinner from "../common/loader";
 import Notes from "./Notes";
@@ -13,8 +28,13 @@ import { fetchAppointmentsAPI } from "@/service/appointmentService";
 import { handleDownloadPDF, TestTypeSelectedRefresh } from "@/service/actionService";
 import AddAppointmentButton from "./AddButton";
 import { sectionsApi, locationsApi, Section, Location } from "@/services/api";
+import { useUserStore } from "@/store/store";
 
 const Dashboard = () => {
+  useAuthEffect();
+  const { user } = useUserStore();
+  const router = useRouter();
+
   const [location, setLocation] = useState<string>("");
   const [dayName, setDayName] = useState("");
   const [selectedDate, setSelectedDate] = useState<dayjs.Dayjs | null>(null);
@@ -33,6 +53,9 @@ const Dashboard = () => {
   const [isLoadingLocations, setIsLoadingLocations] = useState(true);
   const [isLoadingSections, setIsLoadingSections] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [viewingAppointment, setViewingAppointment] = useState<any>(null);
+  const [appointmentToDelete, setAppointmentToDelete] = useState<any>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [sections, setSections] = useState<Section[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
 
@@ -242,6 +265,13 @@ const Dashboard = () => {
     fetchLocations();
   }, [fetchLocations]);
 
+  // Redirect doctors to their dedicated page
+  useEffect(() => {
+    if (user?.role === "doctor") {
+      router.push("/doctor");
+    }
+  }, [user?.role, router]);
+
   // Fetch sections when location changes and locations are loaded
   useEffect(() => {
     if (locations.length > 0 && location) {
@@ -280,9 +310,33 @@ const Dashboard = () => {
 
   // Table Actions ........................................
 
-  // Handle View Function ....
   const handleView = (appointment: any) => {
-    alert(`Vizualizare programare pentru ${appointment.name} ${appointment.surname}`);
+    setViewingAppointment(appointment);
+  };
+
+  const handleViewEdit = (appointment: any) => {
+    setEditData(appointment);
+    setIsModalOpen(true);
+  };
+
+  const handleViewDelete = (appointment: any) => {
+    setAppointmentToDelete(appointment);
+  };
+
+  const handleConfirmDeleteFromView = async () => {
+    if (!appointmentToDelete?._id) return;
+    try {
+      setIsDeleting(true);
+      await api.delete(`/appointments?id=${appointmentToDelete._id}`);
+      toast.success("Programarea a fost ștearsă cu succes!");
+      fetchAppointments();
+      setAppointmentToDelete(null);
+    } catch (err) {
+      console.error(err);
+      toast.error("Ceva nu a mers bine!");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   // Handle Edit Function ...
@@ -312,6 +366,14 @@ const Dashboard = () => {
         <div className="w-full max-w-7xl p-5 space-y-4 bg-gray-100 rounded-md shadow-md py-5 flex justify-center items-center min-h-[400px]">
           <Spinner />
         </div>
+      </div>
+    );
+  }
+
+  if (user?.role === "doctor") {
+    return (
+      <div className="flex flex-col items-center justify-center bg-gray-200 py-5 min-h-screen">
+        <Spinner />
       </div>
     );
   }
@@ -390,10 +452,12 @@ const Dashboard = () => {
             "Nu a fost selectată nicio dată"}
         </div>
         <div className="w-full flex justify-between lg:px-10 px-5 ">
-          <AddAppointmentButton
-            selectedDate={selectedDate}
-            onClick={handleAddAppointment}
-          />
+          {user?.role !== "doctor" && (
+            <AddAppointmentButton
+              selectedDate={selectedDate}
+              onClick={handleAddAppointment}
+            />
+          )}
 
           <button
             className="bg-blue-500 hover:bg-blue-400 text-white rounded px-4 py-1"
@@ -444,6 +508,43 @@ const Dashboard = () => {
         data={editData ? editData : null}
         selectedTestType={selectedTestType || "Ecografie"}
       />
+
+      <ViewAppointment
+        appointment={viewingAppointment}
+        open={!!viewingAppointment}
+        onClose={() => setViewingAppointment(null)}
+        onEdit={handleViewEdit}
+        onDelete={handleViewDelete}
+        isPastDate={(date: string) => !isDateValid(date)}
+      />
+
+      {appointmentToDelete && (
+        <Dialog open={!!appointmentToDelete} onOpenChange={(open) => !open && setAppointmentToDelete(null)}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Confirmă Ștergerea</DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+              Ești sigur că vrei să ștergi această programare?
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAppointmentToDelete(null)} disabled={isDeleting}>
+                Anulează
+              </Button>
+              <Button variant="destructive" onClick={handleConfirmDeleteFromView} disabled={isDeleting}>
+                {isDeleting ? (
+                  <>
+                    <Loader className="mr-2 h-4 w-4 animate-spin" />
+                    Se șterge...
+                  </>
+                ) : (
+                  "Șterge"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };

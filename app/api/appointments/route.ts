@@ -1,356 +1,307 @@
-import dbConnect from "@/utils/mongodb";
 import { NextRequest, NextResponse } from "next/server";
-import AppointmentModel from "@/models/Appointment";
-import SectionModel from "@/models/Section";
-import DoctorModel from "@/models/Doctor";
+import dbConnect from "@/utils/mongodb";
+import AppointModel from "@/models/Appointment";
 import { requireAuth } from "@/utils/authHelpers";
-import countDefaultTimeSlots from "../utils/getDefaultTimeSlotCount";
-import countAppointments from "../utils/countAppointments";
-import ColorsModel from "@/models/Colors";
+import dayjs from "dayjs";
 
+/**
+ * GET /api/appointments
+ * Query: date (YYYY-MM-DD), location, sectionId?, testType?
+ * Returns { success, data, message }
+ */
 export async function GET(request: NextRequest) {
+  try {
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) return authResult;
+
     await dbConnect();
-    
-    // Retrieve query parameters for filters
+
     const { searchParams } = new URL(request.url);
     const date = searchParams.get("date");
     const location = searchParams.get("location");
-    const testType = searchParams.get("testType");
     const sectionId = searchParams.get("sectionId");
-    const doctorName = searchParams.get("doctorName");
-  
- 
-    try {
-      // Authenticate request
-      const authResult = await requireAuth(request);
-      if (authResult instanceof NextResponse) {
-        return authResult; // Return error response if auth failed
-      }
-      const { payload: decoded } = authResult;
-  
-      // Get total count of appointments in database for comparison
-      const totalAppointmentsCount = await AppointmentModel.countDocuments({});
-  
-      // Build filter criteria
-      const filter: any = {};
-      // Date comparison: normalize to start of day for accurate comparison
-      // Parse date string (YYYY-MM-DD) and create date range for the entire day
-      // Use local timezone to avoid UTC conversion issues
-      if (date) {
-        const [year, month, day] = date.split('-').map(Number);
-        const startOfDay = new Date(year, month - 1, day, 0, 0, 0, 0); // Local timezone
-        const endOfDay = new Date(year, month - 1, day, 23, 59, 59, 999); // Local timezone
-        filter.date = {
-          $gte: startOfDay,
-          $lte: endOfDay,
-        };
-      }
-      if (location) filter.location = location;
-      
-      // Handle sectionId and testType filters
-      // When both are provided, filter by sectionId OR testType to catch all relevant appointments
-      // This ensures we catch appointments that might have testType but not sectionId set (backward compatibility)
-      if (sectionId && testType) {
-        // When both are provided, use $or to match either sectionId OR testType
-        const sectionOrTestTypeFilter = {
-          $or: [
-            { sectionId: sectionId },
-            { testType: testType }
-          ]
-        };
-        
-        // If doctorName is also provided, we need to combine filters using $and
-        if (doctorName) {
-          filter.$and = [
-            sectionOrTestTypeFilter,
-            { $or: [{ patientName: doctorName }] }
-          ];
-        } else {
-          filter.$or = sectionOrTestTypeFilter.$or;
-        }
-      } else if (sectionId) {
-        filter.sectionId = sectionId;
-        if (doctorName) {
-          filter.$or = [{ patientName: doctorName }];
-        }
-      } else if (testType) {
-        filter.testType = testType;
-        if (doctorName) {
-          filter.$or = [{ patientName: doctorName }];
-        }
-      } else if (doctorName) {
-        filter.$or = [{ patientName: doctorName }];
-      }
-  
-      
-      // Debug: Count appointments matching filter without date (to see if date is the issue)
-      const filterWithoutDate = { ...filter };
-      delete filterWithoutDate.date;
-      if (Object.keys(filterWithoutDate).length > 0) {
-        const countWithoutDate = await AppointmentModel.countDocuments(filterWithoutDate);
-      }
-  
-      // Fetch filtered appointments with populated section and doctor data
-      // Sort by date first, then by time (timeslot) to ensure chronological order
-      const appointments = await AppointmentModel.find(filter).sort({ date: 1, time: 1 });
-      
-      // Manually populate section and doctor data
-      const populatedAppointments = await Promise.all(
-        appointments.map(async (appointment, index) => {
-          const appointmentObj = appointment.toObject();
-          
-          // Populate section data if sectionId exists
-          if (appointmentObj.sectionId) {
-            try {
-              const section = await SectionModel.findById(appointmentObj.sectionId)
-                .select('name description');
-              if (section) {
-                appointmentObj.section = section.toObject();
-              } 
-            } catch (sectionError) {
-              console.error(`[GET /appointments] Error populating section for sectionId ${appointmentObj.sectionId}:`, sectionError);
-              // Silently skip if section cannot be populated
-            }
-          }
-          
-          // Populate doctor data if doctorId exists
-          if (appointmentObj.doctorId) {
-            try {
-              const doctor = await DoctorModel.findById(appointmentObj.doctorId)
-                .select('name email specialization');
-              if (doctor) {
-                appointmentObj.doctor = doctor.toObject();
-              } 
-            } catch (doctorError) {
-              console.error(`[GET /appointments] Error populating doctor for doctorId ${appointmentObj.doctorId}:`, doctorError);
-              // Silently skip if doctor cannot be populated
-            }
-          }
-          
-          return appointmentObj;
-        })
-      );
-      
-     
-      return NextResponse.json({ success: true, data: populatedAppointments }, { status: 200 });
-    } catch (err) {
-      console.error("Error fetching appointments:", err);
-      return NextResponse.json({ message: "Server Error" }, { status: 500 });
-    }
-}
+    const testType = searchParams.get("testType");
 
-export async function POST(request: NextRequest) {
-  await dbConnect();
-  
-  let requestData;
-  try {
-    requestData = await request.json();
-  } catch (jsonError) {
-    console.error("Error parsing JSON:", jsonError);
+    const filter: Record<string, unknown> = {};
+    if (date) {
+      const start = dayjs(date).startOf("day").toDate();
+      const end = dayjs(date).endOf("day").toDate();
+      filter.date = { $gte: start, $lte: end };
+    }
+    if (location) filter.location = location;
+    if (sectionId) filter.sectionId = sectionId;
+    if (testType) filter.testType = testType;
+    // Doctors only see their own appointments
+    if (authResult.payload.role === "doctor" && authResult.payload.doctorId) {
+      filter.doctorId = authResult.payload.doctorId;
+    }
+
+    const appointments = await AppointModel.find(filter)
+      .populate("sectionId", "name description")
+      .populate("doctorId", "name specialization")
+      .sort({ time: 1 })
+      .lean();
+
+    const data = appointments.map((a: any) => ({
+      ...a,
+      _id: a._id.toString(),
+      sectionId: a.sectionId?._id?.toString() ?? a.sectionId,
+      doctorId: a.doctorId?._id?.toString() ?? a.doctorId,
+      section: a.sectionId && typeof a.sectionId === "object" ? { _id: a.sectionId._id?.toString(), name: a.sectionId.name, description: a.sectionId.description } : undefined,
+      doctor: a.doctorId && typeof a.doctorId === "object" ? { _id: a.doctorId._id?.toString(), name: a.doctorId.name, specialization: a.doctorId.specialization } : undefined,
+      date: a.date ? (typeof a.date === "string" ? a.date : dayjs(a.date).format("YYYY-MM-DD")) : undefined,
+    }));
+
+    return NextResponse.json({ success: true, data }, { status: 200 });
+  } catch (err) {
+    console.error("GET /api/appointments error:", err);
     return NextResponse.json(
-      { message: "Invalid JSON in request body" },
-      { status: 400 }
+      { success: false, message: "Server Error" },
+      { status: 500 }
     );
   }
-  
-  const { 
-    location, 
-    day, 
-    date, 
-    time, 
-    patientName, 
-    testType, 
-    phoneNumber, 
-    isConfirmed, 
-    notes, 
-    doctorName,
-    sectionId,
-    doctorId,
-    isDefault
-  } = requestData;
+}
 
+/**
+ * POST /api/appointments
+ * Body: location, date, day, time, patientName, doctorName?, testType, phoneNumber, isConfirmed?, notes?, sectionId?, doctorId?, isDefault?
+ * Doctors cannot create appointments.
+ */
+export async function POST(request: NextRequest) {
   try {
-    // Authenticate request
     const authResult = await requireAuth(request);
-    if (authResult instanceof NextResponse) {
-      return authResult; // Return error response if auth failed
-    }
-    const { payload: decoded } = authResult;
-
-    // Get the count of default time slots (with section priority)
-    const defaultSlotCount = await countDefaultTimeSlots(location, day, sectionId);
-
-    // Derive doctorName from doctorId if not provided
-    let finalDoctorName = doctorName || '';
-    if (!finalDoctorName && doctorId) {
-      try {
-        const DoctorModel = (await import('@/models/Doctor')).default;
-        const doctor = await DoctorModel.findById(doctorId).select('name');
-        if (doctor) {
-          finalDoctorName = doctor.name || '';
-        }
-      } catch (doctorError) {
-        console.error('Error fetching doctor name:', doctorError);
-        // Continue with empty doctorName if fetch fails
-      }
+    if (authResult instanceof NextResponse) return authResult;
+    if (authResult.payload.role === "doctor") {
+      return NextResponse.json(
+        { success: false, message: "Medicii nu pot crea programări." },
+        { status: 403 }
+      );
     }
 
-    // Create new appointment
-    // Ensure date is a Date object (handle both string and Date formats)
-    const appointmentDate = date instanceof Date ? date : new Date(date);
-    
-    const newAppointment = new AppointmentModel({
+    await dbConnect();
+
+    let body: any;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { success: false, message: "Invalid request body" },
+        { status: 400 }
+      );
+    }
+
+    const {
       location,
+      date: dateInput,
       day,
-      date: appointmentDate,
       time,
       patientName,
-      doctorName: finalDoctorName,
+      doctorName,
       testType,
       phoneNumber,
       isConfirmed,
       notes,
       sectionId,
       doctorId,
-      isDefault: isDefault !== undefined ? isDefault : false, // Use provided isDefault, default to false if not provided
+      isDefault,
+    } = body;
+
+    if (!location || !dateInput || !day || !time || !patientName || !testType || !phoneNumber) {
+      return NextResponse.json(
+        { success: false, message: "Lipsesc câmpuri obligatorii." },
+        { status: 400 }
+      );
+    }
+
+    const date = dayjs(dateInput).isValid() ? dayjs(dateInput).startOf("day").toDate() : new Date(dateInput);
+
+    const doc = await AppointModel.create({
+      location,
+      date,
+      day,
+      time,
+      patientName,
+      doctorName: doctorName ?? "",
+      testType,
+      phoneNumber,
+      isConfirmed: !!isConfirmed,
+      notes: notes ?? "",
+      sectionId: sectionId || undefined,
+      doctorId: doctorId || undefined,
+      isDefault: !!isDefault,
     });
 
-    // Save the appointment to the database
-    await newAppointment.save();
+    const created = await AppointModel.findById(doc._id)
+      .populate("sectionId", "name description")
+      .populate("doctorId", "name specialization")
+      .lean() as { _id: unknown; date: Date } | null;
 
-    // Get the count of appointments for the given location and date
-    const appointmentCount = await countAppointments(location, date);
-    
-    // Determine the color based on the comparison
-    const color = appointmentCount >= defaultSlotCount ? "red" : "blue";
+    if (!created) {
+      return NextResponse.json({ success: false, message: "Server Error" }, { status: 500 });
+    }
+    const out = {
+      ...created,
+      _id: created._id?.toString?.() ?? String(created._id),
+      date: dayjs(created.date).format("YYYY-MM-DD"),
+    };
 
-    // Update or create the color data in the Colors model
-    await ColorsModel.findOneAndUpdate(
-      { location, date: new Date(date) }, // Filter by location and date
-      { color }, // Update the color
-      { upsert: true, new: true } // Create if not exists, return updated document
-    );
-
-    return NextResponse.json(
-      {
-        message: "Appointment Created Successfully!",
-        data: newAppointment,
-        defaultSlotCount,
-        appointmentCount,
-        color,
-      },
-      { status: 201 }
-    );
+    return NextResponse.json({ success: true, data: out }, { status: 201 });
   } catch (err) {
-    console.error("Error creating appointment:", err);
-    return NextResponse.json({ message: "Server Error" }, { status: 500 });
+    console.error("POST /api/appointments error:", err);
+    return NextResponse.json(
+      { success: false, message: "Server Error" },
+      { status: 500 }
+    );
   }
 }
 
-export async function PATCH(request: NextRequest) {
-  await dbConnect();
+function isAppointmentDateInPast(date: Date | string): boolean {
+  const d = typeof date === "string" ? dayjs(date, "YYYY-MM-DD") : dayjs(date);
+  return d.isBefore(dayjs(), "day");
+}
 
+/**
+ * PATCH /api/appointments?id=...
+ * Body: partial appointment fields. Rejects if appointment date is in the past.
+ */
+export async function PATCH(request: NextRequest) {
   try {
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) return authResult;
+
+    await dbConnect();
+
     const id = request.nextUrl.searchParams.get("id");
     if (!id) {
       return NextResponse.json(
-        { message: "Appointment ID is required!" },
+        { success: false, message: "ID lipsește." },
         { status: 400 }
       );
     }
 
-    // Parse the request body for updated data
-    let updatedData;
-    try {
-      updatedData = await request.json();
-    } catch (jsonError) {
-      console.error("Error parsing JSON:", jsonError);
+    const appointment = await AppointModel.findById(id);
+    if (!appointment) {
       return NextResponse.json(
-        { message: "Invalid JSON in request body" },
-        { status: 400 }
+        { success: false, message: "Programarea nu a fost găsită." },
+        { status: 404 }
       );
     }
 
-    // Authenticate request
-    const authResult = await requireAuth(request);
-    if (authResult instanceof NextResponse) {
-      return authResult; // Return error response if auth failed
-    }
-    const { payload: decoded } = authResult;
-
-    // If doctorId is being updated but doctorName is not provided, fetch doctorName
-    if (updatedData.doctorId && !updatedData.doctorName) {
-      try {
-        const DoctorModel = (await import('@/models/Doctor')).default;
-        const doctor = await DoctorModel.findById(updatedData.doctorId).select('name');
-        if (doctor) {
-          updatedData.doctorName = doctor.name || '';
-        }
-      } catch (doctorError) {
-        console.error('Error fetching doctor name for update:', doctorError);
-        // Continue without doctorName if fetch fails
+    if (authResult.payload.role === "doctor" && authResult.payload.doctorId) {
+      const appointmentDoctorId = (appointment.doctorId as any)?.toString?.() ?? appointment.doctorId?.toString?.();
+      if (appointmentDoctorId !== authResult.payload.doctorId) {
+        return NextResponse.json(
+          { success: false, message: "Nu aveți permisiunea să modificați această programare." },
+          { status: 403 }
+        );
       }
     }
 
-    // Partially update the appointment by ID
-    const updatedAppointment = await AppointmentModel.findByIdAndUpdate(
-      id,
-      { $set: updatedData }, // Only update provided fields
-      { new: true, runValidators: true } // Return updated document
-    );
-
-    if (!updatedAppointment) {
+    if (isAppointmentDateInPast(appointment.date)) {
       return NextResponse.json(
-        { message: "Appointment not found!" },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json(
-      { message: "Appointment Updated Successfully!", data: updatedAppointment },
-      { status: 200 }
-    );
-  } catch (err) {
-    console.error("Update Error:", err);
-    return NextResponse.json({ message: "Server Error" }, { status: 500 });
-  }
-}
-
-export async function DELETE(request: NextRequest) {
-  await dbConnect();
-
-  try {
-    // Get appointment ID from query parameters
-    const id = request.nextUrl.searchParams.get("id");
-    if (!id) {
-      return NextResponse.json(
-        { message: "Appointment ID is required!" },
+        { success: false, message: "Nu se pot modifica programări din trecut." },
         { status: 400 }
       );
     }
 
-    // Authenticate request
-    const authResult = await requireAuth(request);
-    if (authResult instanceof NextResponse) {
-      return authResult; // Return error response if auth failed
-    }
-    const { payload: decoded } = authResult;
-
-    // Delete the appointment by ID
-    const deletedAppointment = await AppointmentModel.findByIdAndDelete(id);
-    if (!deletedAppointment) {
+    let body: any;
+    try {
+      body = await request.json();
+    } catch {
       return NextResponse.json(
-        { message: "Appointment not found!" },
+        { success: false, message: "Invalid request body" },
+        { status: 400 }
+      );
+    }
+
+    const allowed = [
+      "time", "patientName", "doctorName", "testType", "phoneNumber",
+      "isConfirmed", "notes", "sectionId", "doctorId", "isDefault",
+    ];
+    const update: Record<string, unknown> = {};
+    for (const key of allowed) {
+      if (body[key] !== undefined) update[key] = body[key];
+    }
+
+    const updated = await AppointModel.findByIdAndUpdate(
+      id,
+      { $set: update },
+      { new: true }
+    )
+      .populate("sectionId", "name description")
+      .populate("doctorId", "name specialization")
+      .lean() as { _id: unknown; date: Date } | null;
+
+    if (!updated) {
+      return NextResponse.json({ success: false, message: "Programarea nu a fost găsită." }, { status: 404 });
+    }
+    const out = {
+      ...updated,
+      _id: updated._id?.toString?.() ?? String(updated._id),
+      date: dayjs(updated.date).format("YYYY-MM-DD"),
+    };
+
+    return NextResponse.json({ success: true, data: out }, { status: 200 });
+  } catch (err) {
+    console.error("PATCH /api/appointments error:", err);
+    return NextResponse.json(
+      { success: false, message: "Server Error" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * DELETE /api/appointments?id=...
+ * Rejects if appointment date is in the past.
+ */
+export async function DELETE(request: NextRequest) {
+  try {
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) return authResult;
+
+    await dbConnect();
+
+    const id = request.nextUrl.searchParams.get("id");
+    if (!id) {
+      return NextResponse.json(
+        { success: false, message: "ID lipsește." },
+        { status: 400 }
+      );
+    }
+
+    const appointment = await AppointModel.findById(id);
+    if (!appointment) {
+      return NextResponse.json(
+        { success: false, message: "Programarea nu a fost găsită." },
         { status: 404 }
       );
     }
 
-    return NextResponse.json(
-      { message: "Appointment Deleted Successfully!" },
-      { status: 200 }
-    );
+    if (authResult.payload.role === "doctor" && authResult.payload.doctorId) {
+      const appointmentDoctorId = (appointment.doctorId as any)?.toString?.() ?? appointment.doctorId?.toString?.();
+      if (appointmentDoctorId !== authResult.payload.doctorId) {
+        return NextResponse.json(
+          { success: false, message: "Nu aveți permisiunea să ștergeți această programare." },
+          { status: 403 }
+        );
+      }
+    }
+
+    if (isAppointmentDateInPast(appointment.date)) {
+      return NextResponse.json(
+        { success: false, message: "Nu se pot șterge programări din trecut." },
+        { status: 400 }
+      );
+    }
+
+    await AppointModel.findByIdAndDelete(id);
+    return NextResponse.json({ success: true, message: "Programarea a fost ștearsă." }, { status: 200 });
   } catch (err) {
-    console.error("Delete Error:", err);
-    return NextResponse.json({ message: "Server Error" }, { status: 500 });
+    console.error("DELETE /api/appointments error:", err);
+    return NextResponse.json(
+      { success: false, message: "Server Error" },
+      { status: 500 }
+    );
   }
 }

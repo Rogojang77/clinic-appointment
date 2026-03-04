@@ -7,6 +7,7 @@ type User = {
   role: string;
   access: string;
   isAdmin?: boolean;
+  doctorId?: string;
 };
 
 type UserStore = {

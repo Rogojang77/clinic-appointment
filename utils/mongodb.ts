@@ -1,9 +1,16 @@
-import mongoose from 'mongoose'; 
+import mongoose from 'mongoose';
 
-const MONGO_URI  = process.env.MONGO_URI; 
-
-if(!MONGO_URI){
-    throw new Error("Please define MONGO_URI environment"); 
+// Support either MONGO_URI or (MONGO_HOST + MONGO_USER + MONGO_PASSWORD) so Docker can pass raw password
+function getMongoUri(): string {
+  if (process.env.MONGO_URI) return process.env.MONGO_URI;
+  const host = process.env.MONGO_HOST;
+  const user = process.env.MONGO_USER;
+  const password = process.env.MONGO_PASSWORD;
+  if (host && user && password) {
+    const encoded = encodeURIComponent(password);
+    return `mongodb://${user}:${encoded}@${host}:27017/clinicdb?authSource=admin`;
+  }
+  throw new Error("Please define MONGO_URI or (MONGO_HOST, MONGO_USER, MONGO_PASSWORD)");
 }
 
 // Cache the connection promise to prevent multiple simultaneous connection attempts
@@ -20,8 +27,11 @@ async function dbConnect(): Promise<typeof mongoose> {
         return cachedPromise;
     }
 
+    // Resolve URI only when connecting (lazy), so build-time page collection doesn't require env
+    const uri = getMongoUri();
+
     // Create a new connection promise
-    cachedPromise = mongoose.connect(MONGO_URI as string, {
+    cachedPromise = mongoose.connect(uri, {
         bufferCommands: false, // Disable mongoose buffering
         maxPoolSize: 10, // Maintain up to 10 socket connections
         serverSelectionTimeoutMS: 20000, // 20s for Docker cold start

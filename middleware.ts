@@ -11,7 +11,7 @@ const PUBLIC_ROUTES = ["/", "/doctors"];
 /**
  * Routes that require authentication
  */
-const PROTECTED_ROUTES = ["/dashboard"];
+const PROTECTED_ROUTES = ["/dashboard", "/doctor"];
 
 /**
  * Routes that require super admin access

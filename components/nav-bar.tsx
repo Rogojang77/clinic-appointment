@@ -1,4 +1,3 @@
-// components/Navbar.js
 "use client";
 import Link from "next/link";
 import Image from "next/image";
@@ -7,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useUserStore } from "@/store/store";
 import { removeToken } from "@/utils/tokenStorage";
 import api from "@/services/api";
+import { copy } from "@/lib/copy";
 
 export default function Navbar() {
   const router = useRouter();
@@ -15,10 +15,10 @@ export default function Navbar() {
 
   const handleLogout = async () => {
     try {
-      const res = await api.get("/logout");
-      removeToken(); // Remove token from localStorage
+      await api.get("/logout");
+      removeToken();
       clearUser();
-      toast.success(res.data.message);
+      toast.success(copy.loggedOut);
       router.push("/");
     } catch (error) {
       // Even if API call fails, clear local state
@@ -43,20 +43,22 @@ export default function Navbar() {
             />
           </Link>
           {user && (
-            <Link href="/dashboard" className=" hover:text-blue-400">
-              Dashboard
+            <Link href={user.role === "doctor" ? "/doctor" : "/dashboard"} className=" hover:text-blue-400">
+              {user.role === "doctor" ? "Programările mele" : copy.dashboard}
             </Link>
           )}
 
-          {user && user.role === 'admin' && (
+          {user && user.role === "admin" && (
             <Link href="/superadmin" className=" hover:text-blue-400">
-              SuperAdmin
+              {copy.superAdmin}
             </Link>
           )}
-          
-          <Link href="/doctors" className=" hover:text-blue-400">
-            Doctors
-          </Link>
+
+          {user && user.role !== "doctor" && (
+            <Link href="/doctors" className=" hover:text-blue-400">
+              {copy.doctors}
+            </Link>
+          )}
         </div>
         <div className="flex space-x-3">
           {user ? (
@@ -64,14 +66,14 @@ export default function Navbar() {
               <div className="flex-col lg:flex hidden mr-5">
                 <p className="text-[16px] font-bold ">{user?.username}</p>
                 <p className="text-[12px] font-normal text-blue-600">
-                  {user?.role}
+                  {user?.role === "doctor" ? "Medic" : user?.role}
                 </p>
               </div>
               <button
                 onClick={handleLogout}
                 className="text-white hover:text-blue-200 bg-red-500 hover:bg-red-400 px-6 py-1 rounded-full h-8 text-sm"
               >
-                Logout
+                {copy.logout}
               </button>
             </>
           ) : (
@@ -79,7 +81,7 @@ export default function Navbar() {
               onClick={() => router.push("/")}
               className="text-white hover:text-blue-200 bg-blue-500 hover:bg-blue-400 px-6 py-1 rounded-full h-8 text-sm"
             >
-              Login
+              {copy.login}
             </button>
           )}
         </div>

@@ -11,6 +11,7 @@ import { Plus } from 'lucide-react';
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [formData, setFormData] = useState({
@@ -27,11 +28,13 @@ export default function UsersPage() {
   const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
+      setLoadError(false);
       const response = await usersApi.getAll();
       setUsers(response.data.data);
     } catch (error) {
       console.error('Error fetching users:', error);
       toast.error('Nu s-au putut încărca utilizatorii');
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -231,15 +234,31 @@ export default function UsersPage() {
           </button>
         </div>
 
+        {/* Error state with Retry */}
+        {loadError && (
+          <div className="rounded-lg border border-gray-200 bg-white p-8 text-center">
+            <p className="text-gray-600 mb-4">Eroare la încărcare. Încercați din nou.</p>
+            <button
+              type="button"
+              onClick={() => fetchUsers()}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium"
+            >
+              Reîncarcă
+            </button>
+          </div>
+        )}
+
         {/* Data Table */}
-        <DataTable
-          data={users}
-          columns={columns}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          loading={loading}
-          emptyMessage="Nu s-au găsit utilizatori. Creează primul utilizator pentru a începe."
-        />
+        {!loadError && (
+          <DataTable
+            data={users}
+            columns={columns}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            loading={loading}
+            emptyMessage="Nu s-au găsit utilizatori. Creează primul utilizator pentru a începe."
+          />
+        )}
 
         {/* Modal */}
         <Modal

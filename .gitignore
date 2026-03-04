@@ -50,6 +50,7 @@ next-env.d.ts
 
 # backup files
 /mongo-backups
+.prod-dump
 
 # IDE and Editor files
 .vscode/

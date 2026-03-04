@@ -49,8 +49,22 @@ export interface User {
   email : string; 
   password: string;
   accessSection: string;
-  role: "admin" | "operator";
+  role: "admin" | "operator" | "doctor";
+  doctorId?: string;
   createdAt?: Date;
+}
+
+export interface MedicalFile {
+  _id: string;
+  appointmentId: string;
+  doctorId: string;
+  diagnosis: string;
+  prescription: string;
+  clinicalNotes: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+  appointment?: Appointment;
+  doctor?: Doctor | { _id: string; name: string; specialization?: string };
 }
 
 

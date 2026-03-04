@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/utils/mongodb';
 import UserModel from '@/models/User';
 import SectionModel from '@/models/Section';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
 
 // GET /api/users/[id] - Get a specific user

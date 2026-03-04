@@ -25,6 +25,7 @@ export interface IDoctor extends Document {
   sectionId: mongoose.Types.ObjectId;
   schedule: IDailySchedule[];
   isActive: boolean;
+  userId?: mongoose.Types.ObjectId; // Link to User account for doctor login
   createdAt: Date;
   updatedAt: Date;
 }
@@ -105,7 +106,12 @@ const DoctorSchema = new Schema<IDoctor>(
     isActive: { 
       type: Boolean, 
       default: true 
-    }
+    },
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: false,
+    },
   },
   {
     timestamps: true,

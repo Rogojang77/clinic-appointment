@@ -1,22 +1,32 @@
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import dbConnect from "@/utils/mongodb";
 import { NextRequest, NextResponse } from "next/server";
 import UserModel from "@/models/User";
-import { createAccessToken, createRefreshToken } from "@/utils/jwtUtils";
+import { createAccessToken, createRefreshToken, JWTPayload } from "@/utils/jwtUtils";
 
 export async function POST(request: NextRequest) {
   try {
-    await dbConnect();
-  } catch (err) {
-    console.error("DB connection error:", err);
-    return NextResponse.json(
-      { message: "Database unavailable. Please try again later." },
-      { status: 503 }
-    );
-  }
-  const { email, password } = await request.json();
+    let body: { email?: string; password?: string };
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { message: "Invalid request body" },
+        { status: 400 }
+      );
+    }
+    const { email, password } = body;
 
-  try {
+    try {
+      await dbConnect();
+    } catch (err) {
+      console.error("DB connection error:", err);
+      return NextResponse.json(
+        { message: "Database unavailable. Please try again later." },
+        { status: 503 }
+      );
+    }
+
     if (!email || !password) {
       return NextResponse.json(
         { message: "Please Provide Credentials !" },
@@ -35,17 +45,20 @@ export async function POST(request: NextRequest) {
     const isPasswordValid = await bcrypt.compare(password, user.password);
    
     if(isPasswordValid){
-      const tokenData = {
+      const tokenData: Record<string, unknown> = {
         id: String(user._id),
         email: user.email,
         username: user.username,
         role: user.role,
-        isAdmin: user.role === 'admin' || false
+        isAdmin: user.role === 'admin' || false,
+      };
+      if (user.role === 'doctor' && user.doctorId) {
+        tokenData.doctorId = String(user.doctorId);
       }
 
       // Create both access and refresh tokens
-      const accessToken = await createAccessToken(tokenData);
-      const refreshToken = await createRefreshToken(tokenData);
+      const accessToken = await createAccessToken(tokenData as Omit<JWTPayload, 'iat' | 'exp'>);
+      const refreshToken = await createRefreshToken(tokenData as Omit<JWTPayload, 'iat' | 'exp'>);
       
       if (!accessToken || !refreshToken) {
         return NextResponse.json(
@@ -54,13 +67,16 @@ export async function POST(request: NextRequest) {
         );
       }
   
-      const userResponse = {
+      const userResponse: Record<string, unknown> = {
         username: user.username,
         email: user.email,
         role: user.role,
         access: user.accessSection,
         isAdmin: user.role === 'admin' || false,
       };
+      if (user.role === 'doctor' && user.doctorId) {
+        userResponse.doctorId = String(user.doctorId);
+      }
   
       // Create response with access token in body
       const response = NextResponse.json(
@@ -91,7 +107,8 @@ export async function POST(request: NextRequest) {
       );
     }
   } catch (err) {
-    console.error(err);
+    console.error("Login error:", err);
     return NextResponse.json({ message: "Server Error" }, { status: 500 });
   }
 }
+

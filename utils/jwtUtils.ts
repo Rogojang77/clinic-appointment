@@ -1,6 +1,12 @@
 import { SignJWT, jwtVerify } from 'jose';
 
-const secret = new TextEncoder().encode(process.env.SECRET!);
+function getSecret(): Uint8Array {
+  const raw = process.env.SECRET;
+  if (!raw || raw === 'undefined') {
+    throw new Error('SECRET environment variable is not set (required for JWT)');
+  }
+  return new TextEncoder().encode(raw);
+}
 
 // TypeScript interface for JWT payload
 export interface JWTPayload {
@@ -9,6 +15,7 @@ export interface JWTPayload {
   username: string;
   role: string;
   isAdmin: boolean;
+  doctorId?: string;
   iat?: number;
   exp?: number;
 }
@@ -25,7 +32,7 @@ export async function verifyJWT(token: string): Promise<JWTPayload | null> {
     }
 
     // Verify the token using jose (Edge Runtime compatible)
-    const { payload } = await jwtVerify(token, secret);
+    const { payload } = await jwtVerify(token, getSecret());
     
     // Type guard to ensure payload has required fields
     // Cast to Record<string, any> to safely access properties
@@ -45,6 +52,7 @@ export async function verifyJWT(token: string): Promise<JWTPayload | null> {
         username: String(payloadRecord.username),
         role: String(payloadRecord.role),
         isAdmin: Boolean(payloadRecord.isAdmin),
+        doctorId: payloadRecord.doctorId != null ? String(payloadRecord.doctorId) : undefined,
         iat: typeof payloadRecord.iat === 'number' ? payloadRecord.iat : undefined,
         exp: typeof payloadRecord.exp === 'number' ? payloadRecord.exp : undefined,
       } as JWTPayload;
@@ -75,7 +83,7 @@ export async function createAccessToken(payload: Omit<JWTPayload, 'iat' | 'exp'>
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
       .setExpirationTime('15m') // Short-lived access token
-      .sign(secret);
+      .sign(getSecret());
     
     return token;
   } catch (error) {
@@ -99,7 +107,7 @@ export async function createRefreshToken(payload: Omit<JWTPayload, 'iat' | 'exp'
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
       .setExpirationTime('30d') // Long-lived refresh token
-      .sign(secret);
+      .sign(getSecret());
     
     return token;
   } catch (error) {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyJWT, createAccessToken, createRefreshToken } from "@/utils/jwtUtils";
+import { verifyJWT, createAccessToken, createRefreshToken, JWTPayload } from "@/utils/jwtUtils";
 import dbConnect from "@/utils/mongodb";
 import UserModel from "@/models/User";
 
@@ -56,16 +56,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Create new token data
-    const tokenData = {
+    const tokenData: Record<string, unknown> = {
       id: String(user._id),
       email: user.email,
       username: user.username,
       role: user.role,
       isAdmin: user.role === 'admin' || false,
     };
+    if (user.role === 'doctor' && user.doctorId) {
+      tokenData.doctorId = String(user.doctorId);
+    }
 
     // Create new access token
-    const newAccessToken = await createAccessToken(tokenData);
+    const newAccessToken = await createAccessToken(tokenData as Omit<JWTPayload, 'iat' | 'exp'>);
     
     if (!newAccessToken) {
       return NextResponse.json(
@@ -76,7 +79,7 @@ export async function POST(request: NextRequest) {
 
     // Optionally rotate refresh token (recommended for security)
     // This invalidates the old refresh token and issues a new one
-    const newRefreshToken = await createRefreshToken(tokenData);
+    const newRefreshToken = await createRefreshToken(tokenData as Omit<JWTPayload, 'iat' | 'exp'>);
     
     if (!newRefreshToken) {
       return NextResponse.json(

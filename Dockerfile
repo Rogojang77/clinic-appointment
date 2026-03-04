@@ -11,8 +11,8 @@ RUN yarn install --frozen-lockfile
 # Copy application source code
 COPY . .
 
-# Build the Next.js application
-RUN yarn build
+# Build the Next.js application (use next build directly so seed is not run during image build)
+RUN yarn next build
 
 # Remove development dependencies to reduce image size
 RUN yarn install --production --frozen-lockfile

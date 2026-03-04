@@ -1,12 +1,12 @@
 "use client";
 import { useEffect, useState, useCallback } from 'react';
 import SuperAdminLayout from '@/components/superadmin/SuperAdminLayout';
-import DataTable from '@/components/superadmin/DataTable';
+import DataTable, { ExtraAction } from '@/components/superadmin/DataTable';
 import Modal from '@/components/superadmin/Modal';
 import FormField from '@/components/superadmin/FormField';
 import { doctorsApi, sectionsApi, locationsApi, Doctor, Section, Location } from '@/services/api';
 import toast from 'react-hot-toast';
-import { Plus } from 'lucide-react';
+import { Plus, UserPlus } from 'lucide-react';
 
 export default function DoctorsPage() {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
@@ -21,6 +21,11 @@ export default function DoctorsPage() {
     locationIds: [] as string[]
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [createAccountModalOpen, setCreateAccountModalOpen] = useState(false);
+  const [doctorForAccount, setDoctorForAccount] = useState<Doctor | null>(null);
+  const [accountForm, setAccountForm] = useState({ email: '', username: '', password: '' });
+  const [accountFormErrors, setAccountFormErrors] = useState<Record<string, string>>({});
+  const [creatingAccount, setCreatingAccount] = useState(false);
 
   const fetchDoctors = useCallback(async () => {
     try {
@@ -168,6 +173,59 @@ export default function DoctorsPage() {
     }));
   };
 
+  const handleOpenCreateAccount = (doctor: Doctor) => {
+    setDoctorForAccount(doctor);
+    setAccountForm({ email: '', username: '', password: '' });
+    setAccountFormErrors({});
+    setCreateAccountModalOpen(true);
+  };
+
+  const handleCloseCreateAccount = () => {
+    setCreateAccountModalOpen(false);
+    setDoctorForAccount(null);
+    setAccountForm({ email: '', username: '', password: '' });
+    setAccountFormErrors({});
+  };
+
+  const validateAccountForm = () => {
+    const errors: Record<string, string> = {};
+    if (!accountForm.email?.trim()) errors.email = 'Emailul este obligatoriu';
+    if (!accountForm.username?.trim()) errors.username = 'Username-ul este obligatoriu';
+    if (!accountForm.password?.trim()) errors.password = 'Parola este obligatorie';
+    else if (accountForm.password.length < 6) errors.password = 'Parola trebuie să aibă minim 6 caractere';
+    setAccountFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleCreateAccountSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!doctorForAccount || !validateAccountForm()) return;
+    try {
+      setCreatingAccount(true);
+      await doctorsApi.createAccount(doctorForAccount._id, {
+        email: accountForm.email.trim(),
+        username: accountForm.username.trim(),
+        password: accountForm.password,
+      });
+      toast.success('Contul medicului a fost creat cu succes');
+      handleCloseCreateAccount();
+      fetchDoctors();
+    } catch (error: any) {
+      const msg = error.response?.data?.error || 'Nu s-a putut crea contul';
+      toast.error(msg);
+    } finally {
+      setCreatingAccount(false);
+    }
+  };
+
+  const createAccountAction: ExtraAction = {
+    key: 'createAccount',
+    label: 'Creează cont',
+    icon: <UserPlus className="h-4 w-4" />,
+    onClick: handleOpenCreateAccount,
+    visible: (row) => !(row as Doctor).userId,
+  };
+
   const handleLocationToggle = (locationId: string) => {
     setFormData(prev => {
       const currentIds = prev.locationIds || [];
@@ -254,6 +312,7 @@ export default function DoctorsPage() {
           columns={columns}
           onEdit={handleEdit}
           onDelete={handleDelete}
+          extraActions={[createAccountAction]}
           loading={loading}
           emptyMessage="Nu s-au găsit medici. Creează primul medic pentru a începe."
         />
@@ -329,6 +388,63 @@ export default function DoctorsPage() {
                 className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 {editingDoctor ? 'Actualizează' : 'Creează'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+
+        {/* Create account modal */}
+        <Modal
+          isOpen={createAccountModalOpen}
+          onClose={handleCloseCreateAccount}
+          title={doctorForAccount ? `Creează cont pentru ${doctorForAccount.name}` : 'Creează cont'}
+          size="md"
+        >
+          <form onSubmit={handleCreateAccountSubmit} className="space-y-4">
+            <FormField
+              label="Email"
+              name="email"
+              type="text"
+              value={accountForm.email}
+              onChange={(value) => setAccountForm({ ...accountForm, email: value })}
+              error={accountFormErrors.email}
+              required
+              placeholder="email@exemplu.ro"
+            />
+            <FormField
+              label="Username"
+              name="username"
+              type="text"
+              value={accountForm.username}
+              onChange={(value) => setAccountForm({ ...accountForm, username: value })}
+              error={accountFormErrors.username}
+              required
+              placeholder="Username"
+            />
+            <FormField
+              label="Parolă"
+              name="password"
+              type="password"
+              value={accountForm.password}
+              onChange={(value) => setAccountForm({ ...accountForm, password: value })}
+              error={accountFormErrors.password}
+              required
+              placeholder="Minim 6 caractere"
+            />
+            <div className="flex justify-end space-x-3 pt-4">
+              <button
+                type="button"
+                onClick={handleCloseCreateAccount}
+                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+              >
+                Anulează
+              </button>
+              <button
+                type="submit"
+                disabled={creatingAccount}
+                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+              >
+                {creatingAccount ? 'Se creează...' : 'Creează cont'}
               </button>
             </div>
           </form>

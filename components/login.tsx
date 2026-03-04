@@ -1,52 +1,76 @@
 "use client";
 import { Formik, Form, Field, ErrorMessage } from "formik";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import api from "@/services/api";
 import * as Yup from "yup";
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { useUserStore } from "@/store/store";
-import { useAuthEffect } from "@/hook/useAuthEffect";
 import { setToken } from "@/utils/tokenStorage";
 import { Eye, EyeOff } from "lucide-react";
+import { copy } from "@/lib/copy";
+
+const ALLOWED_REDIRECT_PREFIXES = ["/dashboard", "/doctor", "/doctors", "/superadmin"];
+
+function isRedirectAllowed(path: string | null): boolean {
+  if (!path || typeof path !== "string") return false;
+  const decoded = decodeURIComponent(path);
+  if (!decoded.startsWith("/")) return false;
+  return ALLOWED_REDIRECT_PREFIXES.some((p) => decoded === p || decoded.startsWith(p + "/"));
+}
 
 const signInSchema = Yup.object().shape({
   email: Yup.string()
-    .email("Invalid email address")
-    .required("Email is required"),
+    .email(copy.invalidEmail)
+    .required(copy.emailRequired),
   password: Yup.string()
-    .min(6, "Password must be at least 6 characters")
-    .required("Password is required"),
+    .min(6, copy.passwordMinLength)
+    .required(copy.passwordRequired),
 });
 
 const SignIn = () => {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false); // State to toggle password visibility
+  const [showPassword, setShowPassword] = useState(false);
   const { setUser } = useUserStore();
+
+  const redirectParam = searchParams.get("redirect");
+  const sessionParam = searchParams.get("session");
+  const showSessionExpired = sessionParam === "expired" || sessionParam === "invalid";
 
   const handleSubmit = async (values: any) => {
     try {
       setIsLoading(true);
-      // Use axios directly with withCredentials to ensure cookies are sent/received
       const response = await api.post("/login", values, {
-        withCredentials: true, // Important: include cookies for refresh token
+        withCredentials: true,
       });
       if (response.status === 200) {
         const { user, accessToken } = response.data;
         setUser(user);
-        // Store the access token in localStorage
-        // Refresh token is automatically stored in HttpOnly cookie by server
         setToken(accessToken);
-        router.push("/dashboard");
-        toast.success("Signin Successfully!");
+        let target = (redirectParam && isRedirectAllowed(redirectParam)) ? decodeURIComponent(redirectParam) : "/dashboard";
+        if (!redirectParam && user?.role === "doctor") target = "/doctor";
+        router.push(target);
+        toast.success(copy.loginSuccess);
       } else {
-        toast.error(response.statusText || "Something went wrong!");
+        toast.error(response.data?.message || copy.somethingWrong);
       }
-    } catch (err) {
-      console.error(err);
-      toast.error("Something went wrong !");
+    } catch (err: any) {
+      const status = err.response?.status;
+      const message = err.response?.data?.message;
+      if (status === 404 && (message === "User not found!" || message === "Invalid Credentials")) {
+        toast.error(copy.invalidCredentials);
+      } else if (status === 503) {
+        toast.error(copy.serviceUnavailable);
+      } else if (status === 500) {
+        toast.error(copy.serverError);
+      } else if (status === 400) {
+        toast.error(copy.completeEmailPassword);
+      } else {
+        toast.error(copy.somethingWrong);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -65,8 +89,13 @@ const SignIn = () => {
       </div>
       <div className="w-full max-w-md p-8 space-y-4 bg-white shadow-md rounded-md">
         <h2 className="text-2xl font-bold text-center text-gray-800">
-          Sign In
+          {copy.login}
         </h2>
+        {showSessionExpired && (
+          <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2" role="alert">
+            {copy.sessionExpired}
+          </p>
+        )}
 
         <Formik
           initialValues={{ email: "", password: "" }}
@@ -126,7 +155,7 @@ const SignIn = () => {
                 disabled={isSubmitting || isLoading}
                 className="w-full py-2 px-4 bg-blue-500 text-white font-semibold rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400"
               >
-                {isSubmitting || isLoading ? "Signing in..." : "Sign In"}
+                {isSubmitting || isLoading ? copy.signingIn : copy.login}
               </button>
             </Form>
           )}

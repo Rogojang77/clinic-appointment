@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/utils/mongodb';
 import UserModel from '@/models/User';
 import SectionModel from '@/models/Section';
-import bcrypt from 'bcrypt';
+import DoctorModel from '@/models/Doctor';
+import bcrypt from 'bcryptjs';
 
 // GET /api/users - Get all users with optional filtering
 export async function GET(request: NextRequest) {
@@ -81,13 +82,20 @@ export async function POST(request: NextRequest) {
       password, 
       accessSection, 
       role = 'operator',
-      isAdmin = false 
+      isAdmin = false,
+      doctorId: bodyDoctorId,
     } = body;
     
-    // Validate required fields
-    if (!username || !email || !password || !accessSection) {
+    // Validate required fields (accessSection not required when role is doctor and doctorId provided)
+    if (!username || !email || !password) {
       return NextResponse.json(
-        { success: false, error: 'All required fields must be provided' },
+        { success: false, error: 'Username, email and password are required' },
+        { status: 400 }
+      );
+    }
+    if (role !== 'doctor' && !accessSection) {
+      return NextResponse.json(
+        { success: false, error: 'Access section is required for non-doctor users' },
         { status: 400 }
       );
     }
@@ -104,11 +112,31 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    let resolvedAccessSection = accessSection;
+    let resolvedDoctorId = bodyDoctorId;
+
+    if (role === 'doctor' && bodyDoctorId) {
+      const doctor = await DoctorModel.findById(bodyDoctorId);
+      if (!doctor) {
+        return NextResponse.json(
+          { success: false, error: 'Doctor not found' },
+          { status: 400 }
+        );
+      }
+      if (doctor.userId) {
+        return NextResponse.json(
+          { success: false, error: 'This doctor already has an account' },
+          { status: 409 }
+        );
+      }
+      resolvedAccessSection = String(doctor.sectionId);
+      resolvedDoctorId = doctor._id;
+    }
+
     // Verify section exists (skip validation for "all" access)
-    if (accessSection !== "all") {
-      // Check if it's a valid ObjectId first
-      if (accessSection.match(/^[0-9a-fA-F]{24}$/)) {
-        const section = await SectionModel.findById(accessSection);
+    if (resolvedAccessSection && resolvedAccessSection !== "all") {
+      if (resolvedAccessSection.match(/^[0-9a-fA-F]{24}$/)) {
+        const section = await SectionModel.findById(resolvedAccessSection);
         if (!section) {
           return NextResponse.json(
             { success: false, error: 'Invalid section ID' },
@@ -122,17 +150,25 @@ export async function POST(request: NextRequest) {
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
     
-    const user = new UserModel({
+    const userData: Record<string, unknown> = {
       username,
       email,
       password: hashedPassword,
-      accessSection,
+      accessSection: resolvedAccessSection,
       role,
       isAdmin,
-      isverified: true // Auto-verify for admin-created users
-    });
+      isverified: true,
+    };
+    if (resolvedDoctorId) {
+      userData.doctorId = resolvedDoctorId;
+    }
+    const user = new UserModel(userData);
     
     await user.save();
+
+    if (role === 'doctor' && resolvedDoctorId) {
+      await DoctorModel.findByIdAndUpdate(resolvedDoctorId, { userId: user._id });
+    }
     
     // Return user without password
     const userResponse = user.toObject();

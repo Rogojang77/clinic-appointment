@@ -1,7 +1,7 @@
 const dbConnect = require("./connect");
 const { userData } = require("./data/userdata");
 const UserModel = require("./schema/User");
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 const mongoose = require("mongoose");
 
 async function createUser() {

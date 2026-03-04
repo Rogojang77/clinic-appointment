@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import { Loader } from "lucide-react";
 import Spinner from "../common/loader";
 import api from "@/services/api";
+import { copy } from "@/lib/copy";
 
 interface NotesProps {
   selectedDate: dayjs.Dayjs | null;
@@ -49,7 +50,7 @@ const Notes = ({ selectedDate, location,textareaContent,setTextareaContent }: No
 
   const handleAddOrUpdateNotes = async () => {
     if (!textareaContent.trim()) {
-      toast.error("Please enter some content.");
+      toast.error(copy.enterContent);
       return;
     }
 
