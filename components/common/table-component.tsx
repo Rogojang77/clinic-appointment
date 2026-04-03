@@ -279,7 +279,11 @@ const TableComponent: React.FC<TableComponentProps> = ({
                   return (
                   <tr
                     key={`${appointment._id}-${index}`}
-                    className="hover:bg-gray-50 transition-colors"
+                    className={`${
+                      appointment.isConfirmed === true
+                        ? "bg-red-100 hover:bg-red-200"
+                        : "bg-green-200 hover:bg-green-200"
+                    } transition-colors`}
                   >
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {getStatusBadge(appointment)}
