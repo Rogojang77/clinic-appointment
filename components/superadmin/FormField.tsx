@@ -8,6 +8,7 @@ interface FormFieldProps {
   onChange: (value: any) => void;
   error?: string;
   required?: boolean;
+  disabled?: boolean;
   placeholder?: string;
   options?: { value: string; label: string }[];
   rows?: number;
@@ -21,6 +22,7 @@ export default function FormField({
   onChange,
   error,
   required = false,
+  disabled = false,
   placeholder,
   options = [],
   rows = 3
@@ -38,6 +40,7 @@ export default function FormField({
             onChange={(e) => onChange(e.target.value)}
             className={`${baseClasses} ${error ? errorClasses : ''}`}
             required={required}
+            disabled={disabled}
           >
             <option value="">Select an option</option>
             {options.map((option) => (
@@ -58,6 +61,7 @@ export default function FormField({
             placeholder={placeholder}
             className={`${baseClasses} ${error ? errorClasses : ''}`}
             required={required}
+            disabled={disabled}
           />
         );
 
@@ -87,6 +91,7 @@ export default function FormField({
             placeholder={placeholder}
             className={`${baseClasses} ${error ? errorClasses : ''}`}
             required={required}
+            disabled={disabled}
           />
         );
     }

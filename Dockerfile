@@ -35,10 +35,11 @@ COPY --from=builder /app/package.json ./package.json
 # Copy required files
 COPY crontab /etc/crontabs/root
 COPY backup.sh /app/backup.sh
+COPY reminder-cron.sh /app/reminder-cron.sh
 COPY start.sh /app/start.sh
 
 # Set permissions
-RUN chmod +x /app/backup.sh /app/start.sh
+RUN chmod +x /app/backup.sh /app/reminder-cron.sh /app/start.sh
 
 # Set environment variable for production
 ENV NODE_ENV=production

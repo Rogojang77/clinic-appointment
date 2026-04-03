@@ -3,27 +3,36 @@ import dbConnect from "@/utils/mongodb";
 import MedicalFileModel from "@/models/MedicalFile";
 import AppointModel from "@/models/Appointment";
 import { requireAuth } from "@/utils/authHelpers";
+import {
+  combineMedicalLetterFields,
+  MedicalLetterFields,
+} from "@/utils/medicalLetterFields";
 
-/**
- * GET /api/medical-files?appointmentId=...
- * List medical files. If appointmentId provided, return the one for that appointment.
- * Doctors only see their own files.
- */
 export async function GET(request: NextRequest) {
   try {
     const authResult = await requireAuth(request);
     if (authResult instanceof NextResponse) return authResult;
     const { payload } = authResult;
 
-    await dbConnect();
-
     const { searchParams } = new URL(request.url);
     const appointmentId = searchParams.get("appointmentId");
+    const doctorIdParam = searchParams.get("doctorId");
+    const patientName = searchParams.get("patientName");
+    const fromDate = searchParams.get("fromDate");
+    const toDate = searchParams.get("toDate");
+
+    await dbConnect();
 
     const filter: Record<string, unknown> = {};
-    if (appointmentId) filter.appointmentId = appointmentId;
+    if (appointmentId) {
+      filter.appointmentId = appointmentId;
+    }
+
+    // Role-based doctor scoping
     if (payload.role === "doctor" && payload.doctorId) {
       filter.doctorId = payload.doctorId;
+    } else if ((payload.role === "admin" || payload.role === "superadmin") && doctorIdParam) {
+      filter.doctorId = doctorIdParam;
     }
 
     const files = await MedicalFileModel.find(filter)
@@ -31,19 +40,67 @@ export async function GET(request: NextRequest) {
       .populate("doctorId", "name specialization")
       .sort({ createdAt: -1 })
       .lean();
+    
+    const filtered = files.filter((f: any) => {
+      const appt = f.appointmentId as any;
 
-    const data = files.map((f: any) => ({
-      _id: f._id.toString(),
-      appointmentId: f.appointmentId?._id?.toString() ?? f.appointmentId,
-      doctorId: f.doctorId?._id?.toString() ?? f.doctorId,
-      diagnosis: f.diagnosis,
-      prescription: f.prescription,
-      clinicalNotes: f.clinicalNotes,
-      createdAt: f.createdAt,
-      updatedAt: f.updatedAt,
-      appointment: f.appointmentId,
-      doctor: f.doctorId,
-    }));
+      // Filter by patient name (simple contains, case-insensitive)
+      if (patientName) {
+        const name = (appt?.patientName || "").toString().toLowerCase();
+        if (!name.includes(patientName.toLowerCase())) {
+          return false;
+        }
+      }
+
+      // Filter by appointment date range
+      if (fromDate || toDate) {
+        const apptDate = appt?.date instanceof Date ? appt.date : appt?.date ? new Date(appt.date) : null;
+        if (!apptDate) {
+          return false;
+        }
+        if (fromDate) {
+          const from = new Date(fromDate);
+          if (apptDate < from) return false;
+        }
+        if (toDate) {
+          const to = new Date(toDate);
+          // include entire end day
+          to.setHours(23, 59, 59, 999);
+          if (apptDate > to) return false;
+        }
+      }
+
+      return true;
+    });
+
+    const data = filtered.map((f: any) => {
+      const appt = f.appointmentId as any;
+      const doc = f.doctorId as any;
+      return {
+        _id: f._id.toString(),
+        appointmentId: appt?._id?.toString() ?? appt,
+        doctorId: doc?._id?.toString() ?? doc,
+        diagnosis: f.diagnosis,
+        prescription: f.prescription,
+        clinicalNotes: f.clinicalNotes,
+        fields: f.fields,
+        createdAt: f.createdAt,
+        updatedAt: f.updatedAt,
+        appointment: appt && {
+          _id: appt._id?.toString?.() ?? appt._id,
+          patientName: appt.patientName,
+          date: appt.date,
+          time: appt.time,
+          location: appt.location,
+          testType: appt.testType,
+        },
+        doctor: doc && {
+          _id: doc._id?.toString?.() ?? doc._id,
+          name: doc.name,
+          specialization: doc.specialization,
+        },
+      };
+    });
 
     return NextResponse.json({ success: true, data }, { status: 200 });
   } catch (err) {
@@ -57,7 +114,7 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/medical-files
- * Body: appointmentId, diagnosis?, prescription?, clinicalNotes?
+ * Body: appointmentId, fields? (preferred) OR diagnosis?/prescription?/clinicalNotes? (legacy)
  * Only doctors and admins can create. Operators cannot.
  */
 export async function POST(request: NextRequest) {
@@ -83,7 +140,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { appointmentId, diagnosis, prescription, clinicalNotes } = body;
+    const {
+      appointmentId,
+      diagnosis,
+      prescription,
+      clinicalNotes,
+      fields,
+    } = body as {
+      appointmentId?: string;
+      diagnosis?: string;
+      prescription?: string;
+      clinicalNotes?: string;
+      fields?: Partial<MedicalLetterFields>;
+    };
     if (!appointmentId) {
       return NextResponse.json(
         { success: false, message: "appointmentId is required" },
@@ -129,12 +198,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const combinedFromFields = fields
+      ? combineMedicalLetterFields(fields)
+      : null;
+
     const doc = await MedicalFileModel.create({
       appointmentId,
       doctorId,
-      diagnosis: diagnosis ?? "",
-      prescription: prescription ?? "",
-      clinicalNotes: clinicalNotes ?? "",
+      diagnosis: combinedFromFields?.diagnosis ?? diagnosis ?? "",
+      prescription: combinedFromFields?.prescription ?? prescription ?? "",
+      clinicalNotes: combinedFromFields?.clinicalNotes ?? clinicalNotes ?? "",
+      fields: fields ?? undefined,
     });
 
     const created = await MedicalFileModel.findById(doc._id)

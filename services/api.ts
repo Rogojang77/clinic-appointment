@@ -423,7 +423,71 @@ export const dashboardApi = {
 };
 
 // Medical files API
+export interface MedicalLetterFields {
+  pacientNume: string;
+  pacientDataNasterii: string;
+  pacientCnp: string;
+  dataConsult: string;
+  internarePerioada: string;
+  nrFO: string;
+
+  motivePrezentare: string;
+  oncologic: "DA" | "NU" | "";
+  diagnosticText: string;
+  diagnosticCod: string;
+
+  anamneza: string;
+  factoriRisc: string;
+
+  exClinGeneral: string;
+  exClinLocal: string;
+
+  labNormale: string;
+  labPatologice: string;
+
+  ekg: string;
+  eco: string;
+  rx: string;
+  paracliniceAlte: string;
+
+  tratamentEfectuat: string;
+  alteInformatii: string;
+
+  tratamentRecomandat: string;
+  durataTratament: string;
+
+  revenireInternare: "da" | "nu" | "";
+  revenireTermen: string;
+
+  prescriptie: "eliberata" | "nuNecesara" | "nuEliberata" | "";
+  prescriptieSerieNumar: string;
+
+  concediu: "eliberat" | "nuNecesara" | "nuEliberat" | "";
+  concediuSerieNumar: string;
+
+  ingrijiriDomiciliu: "eliberata" | "nuNecesara" | "";
+  dispozitive: "eliberata" | "nuNecesara" | "";
+
+  dataScrisoare: string;
+  semnaturaMedic: string;
+
+  caleTransmitere: "asigurat" | "posta" | "";
+  detaliiPosta: string;
+}
+
 export interface MedicalFileDto {
+  _id: string;
+  appointmentId: string;
+  doctorId: string;
+  diagnosis: string;
+  prescription: string;
+  clinicalNotes: string;
+  fields?: Partial<MedicalLetterFields>;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface MedicalFileListItem {
   _id: string;
   appointmentId: string;
   doctorId: string;
@@ -432,6 +496,19 @@ export interface MedicalFileDto {
   clinicalNotes: string;
   createdAt?: string;
   updatedAt?: string;
+  appointment?: {
+    _id: string;
+    patientName?: string;
+    date?: string;
+    time?: string;
+    location?: string;
+    testType?: string;
+  };
+  doctor?: {
+    _id: string;
+    name?: string;
+    specialization?: string;
+  };
 }
 
 export const medicalFilesApi = {
@@ -439,10 +516,33 @@ export const medicalFilesApi = {
     api.get<{ success: boolean; data: MedicalFileDto[] }>(`/medical-files?appointmentId=${encodeURIComponent(appointmentId)}`),
   getById: (id: string) =>
     api.get<{ success: boolean; data: MedicalFileDto }>(`/medical-files/${id}`),
-  create: (data: { appointmentId: string; diagnosis?: string; prescription?: string; clinicalNotes?: string }) =>
+  list: (params?: { doctorId?: string; patientName?: string; fromDate?: string; toDate?: string }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.doctorId) searchParams.append('doctorId', params.doctorId);
+    if (params?.patientName) searchParams.append('patientName', params.patientName);
+    if (params?.fromDate) searchParams.append('fromDate', params.fromDate);
+    if (params?.toDate) searchParams.append('toDate', params.toDate);
+    const qs = searchParams.toString();
+    const url = `/medical-files${qs ? `?${qs}` : ''}`;
+    return api.get<{ success: boolean; data: MedicalFileListItem[] }>(url);
+  },
+  create: (data: {
+    appointmentId: string;
+    fields?: Partial<MedicalLetterFields>;
+    diagnosis?: string;
+    prescription?: string;
+    clinicalNotes?: string;
+  }) =>
     api.post<{ success: boolean; data: MedicalFileDto }>('/medical-files', data),
-  update: (id: string, data: { diagnosis?: string; prescription?: string; clinicalNotes?: string }) =>
+  update: (id: string, data: {
+    fields?: Partial<MedicalLetterFields>;
+    diagnosis?: string;
+    prescription?: string;
+    clinicalNotes?: string;
+  }) =>
     api.patch<{ success: boolean; data: MedicalFileDto }>(`/medical-files/${id}`, data),
+  delete: (id: string) =>
+    api.delete<{ success: boolean; message: string }>(`/medical-files/${id}`),
   getPdfUrl: (id: string) => `/api/medical-files/${id}/pdf`,
   downloadPdf: async (id: string, filename?: string) => {
     const response = await api.get<Blob>(`/medical-files/${id}/pdf`, {
@@ -456,6 +556,30 @@ export const medicalFilesApi = {
     a.click();
     URL.revokeObjectURL(url);
   },
+};
+
+export interface WhatsAppChatMessageDto {
+  _id: string;
+  appointmentId: string | null;
+  phoneNumber: string;
+  direction: "inbound" | "outbound";
+  provider: "meta";
+  messageSid: string;
+  text: string;
+  buttonPayload?: string | null;
+  buttonText?: string | null;
+  status: "pending" | "sent" | "delivered" | "read" | "failed";
+  statusError?: string | null;
+  metaTimestamp?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export const whatsappChatApi = {
+  getByAppointment: (appointmentId: string) =>
+    api.get<{ success: boolean; data: WhatsAppChatMessageDto[] }>(
+      `/appointments/${encodeURIComponent(appointmentId)}/whatsapp-chat`
+    ),
 };
 
 export default api;

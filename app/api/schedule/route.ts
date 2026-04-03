@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import LocationScheduleModel from "@/models/LocationSchedule";
 import { requireAuth } from "@/utils/authHelpers";
 import { getAvailableTimeSlots } from "@/utils/timeSlotGenerator";
+import { dedupeSchedule } from "@/utils/weekScheduleGrid";
 
 interface Schedule {
   [day: string]: { date: string; time: string; _id: string }[];
@@ -15,7 +16,7 @@ interface LocationSchedule {
 
 /**
  * GET /api/schedule
- * Get available time slots with priority: Section Schedule > Location Schedule > Custom
+ * Get available time slots from the location schedule in MongoDB (bookings filtered per section when sectionId is sent).
  * Query params: location, day, date, sectionId (optional)
  */
 export async function GET(request: NextRequest) {
@@ -149,6 +150,11 @@ export async function PATCH(request: NextRequest) {
     }
 
     const updatedData = await request.json();
+    if (updatedData?.schedule && typeof updatedData.schedule === "object") {
+      updatedData.schedule = dedupeSchedule(
+        updatedData.schedule as Record<string, unknown>
+      ) as unknown as (typeof updatedData)["schedule"];
+    }
     const updatedSchedule = await LocationScheduleModel.findByIdAndUpdate(
       id,
       { $set: updatedData },

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useAuthEffect } from "@/hook/useAuthEffect";
 import dayjs from "dayjs";
 import { fetchAppointmentsAPI } from "@/service/appointmentService";
@@ -24,7 +25,8 @@ function groupAppointmentsByDay(appointments: any[]): Record<string, any[]> {
     byDay[dateStr].push(a);
   }
   for (const key of Object.keys(byDay)) {
-    byDay[key].sort((x, y) => (x.time || "").localeCompare(y.time || ""));
+    // Newest time first within the same day
+    byDay[key].sort((x, y) => (y.time || "").localeCompare(x.time || ""));
   }
   return byDay;
 }
@@ -34,6 +36,7 @@ const defaultTo = dayjs().add(DAYS_FUTURE, "day").format("YYYY-MM-DD");
 
 export default function DoctorDashboard() {
   useAuthEffect();
+  const router = useRouter();
   const [appointments, setAppointments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [viewingAppointment, setViewingAppointment] = useState<any>(null);
@@ -61,16 +64,11 @@ export default function DoctorDashboard() {
 
   const handleView = (appointment: any) => setViewingAppointment(appointment);
 
-  const today = dayjs().format("YYYY-MM-DD");
   const byDay = groupAppointmentsByDay(appointments);
   const daysInRange = Object.keys(byDay)
     .filter((d) => d >= dateFrom && d <= dateTo)
-    .sort();
-  // Today first, then others in chronological order
-  const sortedDays =
-    daysInRange.includes(today)
-      ? [today, ...daysInRange.filter((d) => d !== today)]
-      : daysInRange;
+    // Newest day first
+    .sort((a, b) => b.localeCompare(a));
 
   if (isLoading) {
     return (
@@ -114,16 +112,17 @@ export default function DoctorDashboard() {
           </div>
         </div>
 
-        {sortedDays.length === 0 ? (
+        {daysInRange.length === 0 ? (
           <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-500">
             Nu aveți programări în această perioadă.
           </div>
         ) : (
           <div className="space-y-6">
-            {sortedDays.map((dateStr) => {
+            {daysInRange.map((dateStr) => {
               const dayAppointments = byDay[dateStr] || [];
               const dayDate = dayjs(dateStr);
               const dayName = dayNameMap[dayDate.format("dddd")] || dayDate.format("dddd");
+              const today = dayjs().format("YYYY-MM-DD");
               const isToday = dateStr === today;
               const isPast = dateStr < today;
 
@@ -160,6 +159,21 @@ export default function DoctorDashboard() {
                               onClick={() => handleView(apt)}
                             >
                               Detalii
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                router.push(
+                                  `/doctor/medical-file/new?appointmentId=${encodeURIComponent(
+                                    apt._id
+                                  )}&patientName=${encodeURIComponent(
+                                    apt.patientName || ""
+                                  )}`
+                                )
+                              }
+                            >
+                              Creează fișă medicală
                             </Button>
                           </div>
                         </li>

@@ -10,9 +10,15 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Edit, Trash2, Download } from "lucide-react";
-import { medicalFilesApi, MedicalFileDto } from "@/services/api";
+import {
+  medicalFilesApi,
+  MedicalFileDto,
+  whatsappChatApi,
+  WhatsAppChatMessageDto,
+} from "@/services/api";
 import toast from "react-hot-toast";
 import { useUserStore } from "@/store/store";
+import { useRouter } from "next/navigation";
 
 export interface ViewAppointmentData {
   _id: string;
@@ -50,6 +56,7 @@ export default function ViewAppointment({
   showAppointmentActions = true,
 }: ViewAppointmentProps) {
   const { user } = useUserStore();
+  const router = useRouter();
   const canManageMedicalFile = user?.role === "doctor" || user?.role === "admin";
 
   const [medicalFile, setMedicalFile] = useState<MedicalFileDto | null>(null);
@@ -60,6 +67,8 @@ export default function ViewAppointment({
     clinicalNotes: "",
   });
   const [medicalFileSaving, setMedicalFileSaving] = useState(false);
+  const [chatMessages, setChatMessages] = useState<WhatsAppChatMessageDto[]>([]);
+  const [chatLoading, setChatLoading] = useState(false);
 
   const fetchMedicalFile = useCallback(async (appointmentId: string) => {
     try {
@@ -90,6 +99,28 @@ export default function ViewAppointment({
       fetchMedicalFile(appointment._id);
     }
   }, [open, appointment?._id, canManageMedicalFile, fetchMedicalFile]);
+
+  useEffect(() => {
+    let ignore = false;
+    async function loadChat() {
+      if (!open || !appointment?._id) return;
+      try {
+        setChatLoading(true);
+        const res = await whatsappChatApi.getByAppointment(appointment._id);
+        if (!ignore) {
+          setChatMessages(res.data?.data || []);
+        }
+      } catch {
+        if (!ignore) setChatMessages([]);
+      } finally {
+        if (!ignore) setChatLoading(false);
+      }
+    }
+    loadChat();
+    return () => {
+      ignore = true;
+    };
+  }, [open, appointment?._id]);
 
   const handleSaveMedicalFile = async () => {
     if (!appointment) return;
@@ -122,6 +153,11 @@ export default function ViewAppointment({
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Eroare la descărcare");
     }
+  };
+
+  const handleOpenMedicalFilePage = () => {
+    if (!appointment) return;
+    router.push(`/doctor/medical-file/new?appointmentId=${encodeURIComponent(appointment._id)}`);
   };
 
   if (!appointment) return null;
@@ -174,60 +210,137 @@ export default function ViewAppointment({
               <span className="min-h-[1.5rem]">{appointment.notes || "—"}</span>
             </div>
 
-            {/* Medical file section - inline (only for doctors and admins; operators cannot create/edit) */}
-            {canManageMedicalFile && (
-            <div className="border-t pt-4 mt-4 space-y-4">
-              <span className="font-medium text-gray-700 block">Fișă medicală</span>
-              {medicalFileLoading ? (
-                <p className="text-sm text-gray-500">Se încarcă...</p>
+            <div className="border-t pt-4 mt-4 space-y-3">
+              <span className="font-medium text-gray-700 block">Chat WhatsApp</span>
+              {chatLoading ? (
+                <p className="text-sm text-gray-500">Se încarcă conversația...</p>
+              ) : chatMessages.length === 0 ? (
+                <p className="text-sm text-gray-500">Niciun mesaj pentru această programare.</p>
               ) : (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Diagnostic</label>
-                    <textarea
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm min-h-[72px]"
-                      value={medicalFileForm.diagnosis}
-                      onChange={(e) => setMedicalFileForm((f) => ({ ...f, diagnosis: e.target.value }))}
-                      placeholder="Diagnostic"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Prescripție</label>
-                    <textarea
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm min-h-[72px]"
-                      value={medicalFileForm.prescription}
-                      onChange={(e) => setMedicalFileForm((f) => ({ ...f, prescription: e.target.value }))}
-                      placeholder="Prescripție"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Observații clinice</label>
-                    <textarea
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm min-h-[72px]"
-                      value={medicalFileForm.clinicalNotes}
-                      onChange={(e) => setMedicalFileForm((f) => ({ ...f, clinicalNotes: e.target.value }))}
-                      placeholder="Observații clinice"
-                    />
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleSaveMedicalFile}
-                      disabled={medicalFileSaving}
-                    >
-                      {medicalFileSaving ? "Se salvează..." : medicalFile ? "Actualizează" : "Creează fișă medicală"}
-                    </Button>
-                    {medicalFile && (
-                      <Button variant="outline" size="sm" onClick={handleDownloadPdf}>
-                        <Download className="h-4 w-4 mr-1" />
-                        Descarcă PDF
-                      </Button>
-                    )}
-                  </div>
-                </>
+                <div className="space-y-2 max-h-64 overflow-y-auto rounded-md border border-gray-200 bg-gray-50 p-3">
+                  {chatMessages.map((msg) => {
+                    const isOutbound = msg.direction === "outbound";
+                    const stamp = msg.createdAt
+                      ? new Date(msg.createdAt).toLocaleString("ro-RO")
+                      : "";
+                    const text =
+                      msg.buttonText ||
+                      msg.buttonPayload ||
+                      msg.text ||
+                      "(fără text)";
+                    return (
+                      <div
+                        key={msg._id}
+                        className={`flex ${isOutbound ? "justify-end" : "justify-start"}`}
+                      >
+                        <div
+                          className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
+                            isOutbound
+                              ? "bg-green-100 text-green-900"
+                              : "bg-white border border-gray-200 text-gray-900"
+                          }`}
+                        >
+                          <div className="whitespace-pre-wrap break-words">{text}</div>
+                          <div className="mt-1 text-[11px] text-gray-500 flex gap-2">
+                            <span>{stamp}</span>
+                            <span>{isOutbound ? `status: ${msg.status}` : "inbound"}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
+
+            {/* Medical file section - now links to dedicated page for doctors; admins keep inline form */}
+            {canManageMedicalFile && (
+              <div className="border-t pt-4 mt-4 space-y-4">
+                <span className="font-medium text-gray-700 block">Fișă medicală</span>
+                {medicalFileLoading ? (
+                  <p className="text-sm text-gray-500">Se încarcă...</p>
+                ) : (
+                  <>
+                    {user?.role === "admin" ? (
+                      <>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Diagnostic</label>
+                          <textarea
+                            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm min-h-[72px]"
+                            value={medicalFileForm.diagnosis}
+                            onChange={(e) =>
+                              setMedicalFileForm((f) => ({
+                                ...f,
+                                diagnosis: e.target.value,
+                              }))
+                            }
+                            placeholder="Diagnostic"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Prescripție</label>
+                          <textarea
+                            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm min-h-[72px]"
+                            value={medicalFileForm.prescription}
+                            onChange={(e) =>
+                              setMedicalFileForm((f) => ({
+                                ...f,
+                                prescription: e.target.value,
+                              }))
+                            }
+                            placeholder="Prescripție"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Observații clinice
+                          </label>
+                          <textarea
+                            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm min-h-[72px]"
+                            value={medicalFileForm.clinicalNotes}
+                            onChange={(e) =>
+                              setMedicalFileForm((f) => ({
+                                ...f,
+                                clinicalNotes: e.target.value,
+                              }))
+                            }
+                            placeholder="Observații clinice"
+                          />
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleSaveMedicalFile}
+                            disabled={medicalFileSaving}
+                          >
+                            {medicalFileSaving
+                              ? "Se salvează..."
+                              : medicalFile
+                              ? "Actualizează"
+                              : "Creează fișă medicală"}
+                          </Button>
+                          {medicalFile && (
+                            <Button variant="outline" size="sm" onClick={handleDownloadPdf}>
+                              <Download className="h-4 w-4 mr-1" />
+                              Descarcă PDF
+                            </Button>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex flex-wrap gap-2 items-center">
+                        {medicalFile && (
+                          <Button variant="outline" size="sm" onClick={handleDownloadPdf}>
+                            <Download className="h-4 w-4 mr-1" />
+                            Descarcă PDF
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             )}
           </div>
           <DialogFooter className="gap-2 sm:gap-0">

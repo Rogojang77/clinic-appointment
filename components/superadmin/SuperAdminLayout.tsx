@@ -16,7 +16,8 @@ import {
   UserCheck,
   LogOut,
   Menu,
-  X
+  X,
+  MapPin,
 } from 'lucide-react';
 
 interface SuperAdminLayoutProps {
@@ -75,6 +76,12 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
       href: '/superadmin/sections',
       icon: Building2,
       current: pathname.startsWith('/superadmin/sections')
+    },
+    {
+      name: 'Program locații',
+      href: '/superadmin/location-schedules',
+      icon: MapPin,
+      current: pathname.startsWith('/superadmin/location-schedules')
     },
     {
       name: 'Doctors',

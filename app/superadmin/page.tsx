@@ -10,9 +10,8 @@ import {
   Calendar,
   TrendingUp,
   Clock,
-  CheckCircle,
   MapPin,
-  FileText
+  FileText,
 } from 'lucide-react';
 
 export default function SuperAdminDashboard() {

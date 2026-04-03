@@ -6,12 +6,10 @@ import { useAuthEffect } from "@/hook/useAuthEffect";
 import TableComponent from "../common/table-component";
 import CalendarGrid from "./calender-grid";
 import AppointmentAddEdit from "./add-appointment";
-import ViewAppointment from "./view-appointment";
 import dayjs from "dayjs";
 import { useRouter } from "next/navigation";
 import api from "@/services/api";
 import toast from "react-hot-toast";
-import isDateValid from "@/utils/isValidDate";
 import {
   Dialog,
   DialogContent,
@@ -53,7 +51,6 @@ const Dashboard = () => {
   const [isLoadingLocations, setIsLoadingLocations] = useState(true);
   const [isLoadingSections, setIsLoadingSections] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [viewingAppointment, setViewingAppointment] = useState<any>(null);
   const [appointmentToDelete, setAppointmentToDelete] = useState<any>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [sections, setSections] = useState<Section[]>([]);
@@ -310,19 +307,6 @@ const Dashboard = () => {
 
   // Table Actions ........................................
 
-  const handleView = (appointment: any) => {
-    setViewingAppointment(appointment);
-  };
-
-  const handleViewEdit = (appointment: any) => {
-    setEditData(appointment);
-    setIsModalOpen(true);
-  };
-
-  const handleViewDelete = (appointment: any) => {
-    setAppointmentToDelete(appointment);
-  };
-
   const handleConfirmDeleteFromView = async () => {
     if (!appointmentToDelete?._id) return;
     try {
@@ -482,7 +466,6 @@ const Dashboard = () => {
         ) : (
           <TableComponent
             appointments={data || []}
-            onView={handleView}
             onEdit={handleEdit}
             fetchData={fetchAppointments}
             selectedTestType={selectedTestType}
@@ -507,15 +490,6 @@ const Dashboard = () => {
         fetchAppointments={fetchAppointments}
         data={editData ? editData : null}
         selectedTestType={selectedTestType || "Ecografie"}
-      />
-
-      <ViewAppointment
-        appointment={viewingAppointment}
-        open={!!viewingAppointment}
-        onClose={() => setViewingAppointment(null)}
-        onEdit={handleViewEdit}
-        onDelete={handleViewDelete}
-        isPastDate={(date: string) => !isDateValid(date)}
       />
 
       {appointmentToDelete && (

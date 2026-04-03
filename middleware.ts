@@ -90,7 +90,16 @@ export async function middleware(request: NextRequest) {
 
   // Public API routes that don't require authentication
   // Note: /api/auth/refresh uses refresh token cookie, not Authorization header
-  const PUBLIC_API_ROUTES = ["/api/login", "/api/register", "/api/logout", "/api/auth/refresh"];
+  const PUBLIC_API_ROUTES = [
+    "/api/login",
+    "/api/register",
+    "/api/logout",
+    "/api/auth/refresh",
+    "/api/appointments/confirm",
+    "/api/webhooks/meta/whatsapp",
+    // Cron (wget) sends x-cron-secret only; route validates REMINDER_CRON_SECRET
+    "/api/notifications/whatsapp/appointments-24h",
+  ];
   const isPublicApiRoute = PUBLIC_API_ROUTES.some(route => path === route || path.startsWith(`${route}/`));
 
   // Handle API routes

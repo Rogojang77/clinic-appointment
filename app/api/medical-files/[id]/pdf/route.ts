@@ -65,6 +65,7 @@ export async function GET(
       diagnosis: (file as any).diagnosis,
       prescription: (file as any).prescription,
       clinicalNotes: (file as any).clinicalNotes,
+      fields: (file as any).fields,
     };
 
     const pdfBuffer = generateMedicalFilePdf(appointmentData, medicalFileData);

@@ -1,14 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, Edit, Trash, Loader } from "lucide-react";
+import { Edit, Trash, Loader, MessageCircle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  DialogTrigger,
 } from "@/components/ui/dialog"; // Adjust the import path based on your structure
 import { Button } from "@/components/ui/button"; // Adjust the import path
 import { Switch } from "@/components/ui/switch";
@@ -25,6 +24,10 @@ interface Appointment {
   testType: string;
   phoneNumber: string;
   isConfirmed: boolean;
+  whatsAppReminderStatus?: "not_sent" | "sent" | "failed";
+  patientDecision?: "pending" | "confirmed" | "declined" | "reschedule";
+  whatsAppLastInboundAt?: string;
+  whatsAppLastInboundBody?: string;
   doctorName: string;
   notes: string;
   sectionId?: string;
@@ -44,7 +47,6 @@ interface Appointment {
 
 interface TableComponentProps {
   appointments: Appointment[];
-  onView: (appointment: Appointment) => void;
   onEdit: (appointment: Appointment) => void;
   fetchData: () => void;
   selectedTestType?: string | null;
@@ -52,7 +54,6 @@ interface TableComponentProps {
 
 const TableComponent: React.FC<TableComponentProps> = ({
   appointments,
-  onView,
   onEdit,
   fetchData,
   selectedTestType,
@@ -61,6 +62,8 @@ const TableComponent: React.FC<TableComponentProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
   const [appointmentToDelete, setAppointmentToDelete] =
     useState<Appointment | null>(null);
+  const [sendingById, setSendingById] = useState<Record<string, boolean>>({});
+  const [sentById, setSentById] = useState<Record<string, boolean>>({});
   const [sortField, setSortField] = useState<string>('');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
@@ -155,6 +158,21 @@ const TableComponent: React.FC<TableComponentProps> = ({
     }
   };
 
+  const handleSendWhatsApp = async (appointment: Appointment) => {
+    try {
+      setSendingById((prev) => ({ ...prev, [appointment._id]: true }));
+      await api.post(`/appointments/${appointment._id}/whatsapp-reminder`);
+      setSentById((prev) => ({ ...prev, [appointment._id]: true }));
+      toast.success("Mesajul WhatsApp a fost trimis!");
+      fetchData();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.response?.data?.message || "Ceva nu a mers bine!");
+    } finally {
+      setSendingById((prev) => ({ ...prev, [appointment._id]: false }));
+    }
+  };
+
   const renderTable = (appointmentsToRender: Appointment[], title?: string) => {
     const sortedData = sortData(appointmentsToRender);
 
@@ -163,6 +181,45 @@ const TableComponent: React.FC<TableComponentProps> = ({
     }
 
     const isEcografie = selectedTestType === "Ecografie";
+    
+    const getStatusBadge = (appointment: Appointment) => {
+      const decision = appointment.patientDecision;
+      // Status refers ONLY to WhatsApp flow (sent + link decision),
+      // not to manual staff confirmation (`isConfirmed`).
+      if (decision === "confirmed") {
+        return (
+          <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+            Confirmat
+          </span>
+        );
+      }
+      if (decision === "declined") {
+        return (
+          <span className="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">
+            Refuzat
+          </span>
+        );
+      }
+      if (decision === "reschedule") {
+        return (
+          <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
+            Reprogramare
+          </span>
+        );
+      }
+      if (appointment.whatsAppReminderStatus === "sent") {
+        return (
+          <span className="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">
+            Trimis
+          </span>
+        );
+      }
+      return (
+        <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">
+          Netrimis
+        </span>
+      );
+    };
 
     const SortableHeader = ({ field, label }: { field: string; label: string }) => (
       <th
@@ -193,6 +250,9 @@ const TableComponent: React.FC<TableComponentProps> = ({
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status WhatsApp
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Acțiuni
                   </th>
                   <SortableHeader field="time" label="Ora" />
@@ -212,15 +272,18 @@ const TableComponent: React.FC<TableComponentProps> = ({
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {sortedData.map((appointment, index) => (
+                {sortedData.map((appointment, index) => {
+                  const isWhatsAppSent =
+                    appointment.whatsAppReminderStatus === "sent" ||
+                    !!sentById[appointment._id];
+                  return (
                   <tr
                     key={`${appointment._id}-${index}`}
-                    className={`${
-                      appointment.isConfirmed === true 
-                        ? "bg-red-100 hover:bg-red-200" 
-                        : "bg-green-200 hover:bg-green-200"
-                    } transition-colors`}
+                    className="hover:bg-gray-50 transition-colors"
                   >
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {getStatusBadge(appointment)}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center space-x-2">
                         <button
@@ -234,6 +297,26 @@ const TableComponent: React.FC<TableComponentProps> = ({
                           title="Editează"
                         >
                           <Edit className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleSendWhatsApp(appointment)}
+                          className={`${
+                            isDateValid(appointment.date) && !isWhatsAppSent
+                              ? "text-green-700 hover:text-green-900"
+                              : "text-gray-400 cursor-not-allowed"
+                          }`}
+                          disabled={
+                            !isDateValid(appointment.date) ||
+                            isWhatsAppSent ||
+                            !!sendingById[appointment._id]
+                          }
+                          title="Trimite WhatsApp"
+                        >
+                          {sendingById[appointment._id] ? (
+                            <Loader className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <MessageCircle className="h-4 w-4" />
+                          )}
                         </button>
                         <button
                           onClick={() => confirmDelete(appointment)}
@@ -287,7 +370,8 @@ const TableComponent: React.FC<TableComponentProps> = ({
                       </td>
                     )}
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

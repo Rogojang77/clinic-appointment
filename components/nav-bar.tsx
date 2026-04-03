@@ -13,6 +13,15 @@ export default function Navbar() {
   const user = useUserStore((state) => state.user);
   const { clearUser } = useUserStore();
 
+  const logoHref =
+    !user
+      ? "/"
+      : user.role === "doctor"
+      ? "/doctor"
+      : user.role === "admin" && (user as any).isAdmin
+      ? "/superadmin"
+      : "/dashboard";
+
   const handleLogout = async () => {
     try {
       await api.get("/logout");
@@ -33,7 +42,7 @@ export default function Navbar() {
       <div className="container mx-auto w-full max-w-7xl flex justify-between items-center">
         {/* Logo */}
         <div className="flex space-x-5 justify-center items-center ">
-          <Link href="/" className=" text-lg font-bold">
+          <Link href={logoHref} className=" text-lg font-bold">
             <Image
               src="/mos2.jpg"
               width={100}
@@ -43,9 +52,22 @@ export default function Navbar() {
             />
           </Link>
           {user && (
-            <Link href={user.role === "doctor" ? "/doctor" : "/dashboard"} className=" hover:text-blue-400">
-              {user.role === "doctor" ? "Programările mele" : copy.dashboard}
-            </Link>
+            <>
+              <Link
+                href={user.role === "doctor" ? "/doctor" : "/dashboard"}
+                className=" hover:text-blue-400"
+              >
+                {user.role === "doctor" ? "Programările mele" : copy.dashboard}
+              </Link>
+              {user.role === "doctor" && (
+                <Link
+                  href="/doctor/medical-files"
+                  className=" hover:text-blue-400"
+                >
+                  Fișele mele medicale
+                </Link>
+              )}
+            </>
           )}
 
           {user && user.role === "admin" && (

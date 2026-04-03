@@ -3,6 +3,18 @@ import dbConnect from "@/utils/mongodb";
 import AppointModel from "@/models/Appointment";
 import { requireAuth } from "@/utils/authHelpers";
 import dayjs from "dayjs";
+import { computeWhatsAppReminderWindowBounds } from "@/utils/appointmentDateTime";
+
+function weekdayRoFromYmd(ymd: string): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  if (!y || !m || !d) return "";
+  const dt = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  const s = new Intl.DateTimeFormat("ro-RO", {
+    weekday: "long",
+    timeZone: "Europe/Bucharest",
+  }).format(dt);
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
 
 /**
  * GET /api/appointments
@@ -114,6 +126,9 @@ export async function POST(request: NextRequest) {
     }
 
     const date = dayjs(dateInput).isValid() ? dayjs(dateInput).startOf("day").toDate() : new Date(dateInput);
+    const confirmed = !!isConfirmed;
+    const windowBounds =
+      !confirmed ? computeWhatsAppReminderWindowBounds({ date, time }) : null;
 
     const doc = await AppointModel.create({
       location,
@@ -124,11 +139,13 @@ export async function POST(request: NextRequest) {
       doctorName: doctorName ?? "",
       testType,
       phoneNumber,
-      isConfirmed: !!isConfirmed,
+      isConfirmed: confirmed,
       notes: notes ?? "",
       sectionId: sectionId || undefined,
       doctorId: doctorId || undefined,
       isDefault: !!isDefault,
+      whatsAppReminderWindowStart: windowBounds?.start ?? null,
+      whatsAppReminderWindowEnd: windowBounds?.end ?? null,
     });
 
     const created = await AppointModel.findById(doc._id)
@@ -215,12 +232,67 @@ export async function PATCH(request: NextRequest) {
     }
 
     const allowed = [
-      "time", "patientName", "doctorName", "testType", "phoneNumber",
-      "isConfirmed", "notes", "sectionId", "doctorId", "isDefault",
+      "time",
+      "date",
+      "patientName",
+      "doctorName",
+      "testType",
+      "phoneNumber",
+      "isConfirmed",
+      "notes",
+      "sectionId",
+      "doctorId",
+      "isDefault",
     ];
     const update: Record<string, unknown> = {};
     for (const key of allowed) {
       if (body[key] !== undefined) update[key] = body[key];
+    }
+
+    if (update.date !== undefined) {
+      const di = update.date;
+      const nextDate =
+        di instanceof Date
+          ? dayjs(di).startOf("day").toDate()
+          : dayjs(String(di)).isValid()
+            ? dayjs(String(di)).startOf("day").toDate()
+            : null;
+      if (!nextDate) {
+        return NextResponse.json(
+          { success: false, message: "Dată invalidă." },
+          { status: 400 }
+        );
+      }
+      update.date = nextDate;
+      const ymd = dayjs.utc(nextDate).format("YYYY-MM-DD");
+      update.day = weekdayRoFromYmd(ymd);
+    }
+
+    const nextIsConfirmed =
+      update.isConfirmed !== undefined ? !!update.isConfirmed : appointment.isConfirmed;
+    const becameUnconfirmed =
+      update.isConfirmed === false && appointment.isConfirmed === true;
+
+    const effectiveDate = (update.date as Date | undefined) ?? appointment.date;
+    const effectiveTime = (update.time as string | undefined) ?? appointment.time;
+
+    if (nextIsConfirmed) {
+      update.whatsAppReminderWindowStart = null;
+      update.whatsAppReminderWindowEnd = null;
+    } else {
+      const dateOrTimeChanged =
+        update.date !== undefined || update.time !== undefined;
+      if (dateOrTimeChanged || becameUnconfirmed) {
+        const bounds = computeWhatsAppReminderWindowBounds({
+          date: effectiveDate,
+          time: effectiveTime,
+        });
+        update.whatsAppReminderWindowStart = bounds?.start ?? null;
+        update.whatsAppReminderWindowEnd = bounds?.end ?? null;
+        update.whatsAppReminderStatus = "not_sent";
+        update.whatsAppReminderSentAt = null;
+        update.whatsAppReminderMessageSid = null;
+      }
     }
 
     const updated = await AppointModel.findByIdAndUpdate(

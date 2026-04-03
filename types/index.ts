@@ -20,6 +20,16 @@ export interface Appointment {
   isConfirmed: boolean;
   isDefault?: boolean;
   notes: string;
+  whatsAppReminderStatus?: "not_sent" | "sent" | "failed";
+  whatsAppReminderSentAt?: Date | string | null;
+  whatsAppReminderMessageSid?: string | null;
+  whatsAppReminderWindowStart?: Date | string | null;
+  whatsAppReminderWindowEnd?: Date | string | null;
+  patientDecision?: "pending" | "confirmed" | "declined" | "reschedule";
+  patientDecisionAt?: Date | string | null;
+  whatsAppLastInboundAt?: Date | string | null;
+  whatsAppLastInboundBody?: string;
+  whatsAppLastInboundMessageSid?: string | null;
   // New relationship fields - support both string IDs and populated objects
   sectionId?: string | { _id: string; name: string; description?: string };
   doctorId?: string | { _id: string; name: string; specialization?: string };
