@@ -113,6 +113,62 @@ export function computeWhatsAppReminderWindowBounds(params: {
   return { start: w.start.toDate(), end: w.end.toDate() };
 }
 
+function weekdayRoLongFromDayjs(d: Dayjs): string {
+  const s = new Intl.DateTimeFormat("ro-RO", {
+    weekday: "long",
+    timeZone: DEFAULT_TIMEZONE,
+  }).format(d.toDate());
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/**
+ * Text pentru UI: când poate pleca reminderul WhatsApp (aceeași regulă ca la salvare / cron).
+ * Returnează null dacă data/ora nu sunt valide.
+ */
+export function describeWhatsAppReminderWindowRo(params: {
+  date: Date | string;
+  time: string;
+  tz?: string;
+}): {
+  kind: WhatsAppReminderDispatchKind;
+  windowStartLabel: string;
+  windowEndLabel: string;
+  headline: string;
+  detail: string;
+} | null {
+  const apptDt = appointmentToZonedDateTime({
+    date: params.date,
+    time: params.time,
+    tz: params.tz ?? DEFAULT_TIMEZONE,
+  });
+  if (!apptDt) return null;
+  const w = getWhatsAppReminderDispatchWindow(apptDt);
+  if (!w) return null;
+
+  const windowStartLabel = w.start.format("DD.MM.YYYY, HH:mm");
+  const windowEndLabel = w.end.format("DD.MM.YYYY, HH:mm");
+  const apptLabel = apptDt.format("DD.MM.YYYY, HH:mm");
+
+  if (w.kind === "previous_evening") {
+    const dayName = weekdayRoLongFromDayjs(w.start);
+    return {
+      kind: w.kind,
+      windowStartLabel,
+      windowEndLabel,
+      headline: `Între ${windowStartLabel} și ${windowEndLabel}`,
+      detail: `Programare la ${apptLabel}. Reminderul WhatsApp poate fi trimis automat în seara anterioară (${dayName}), în acest interval. Trimiterea nu este la secundă fixă: serviciul verifică periodic și trimite la primul moment util din fereastră.`,
+    };
+  }
+
+  return {
+    kind: w.kind,
+    windowStartLabel,
+    windowEndLabel,
+    headline: `Între ${windowStartLabel} și ${windowEndLabel}`,
+    detail: `Programare la ${apptLabel}. Reminderul WhatsApp poate fi trimis automat în dimineața aceleiași zile, în acest interval. Trimiterea nu este la secundă fixă: serviciul verifică periodic și trimite la primul moment util din fereastră.`,
+  };
+}
+
 /** Cron: acum e în fereastra salvată [start, end). */
 export function isNowInsideStoredReminderWindow(
   windowStart: Date,

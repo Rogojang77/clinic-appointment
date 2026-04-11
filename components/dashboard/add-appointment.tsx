@@ -6,7 +6,7 @@ import * as Yup from "yup";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ChevronUp, ChevronDown, Loader } from "lucide-react";
+import { ChevronUp, ChevronDown, Loader, MessageCircle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +21,7 @@ import { Switch } from "@/components/ui/switch";
 import { fetchTimeSlotsAPI } from "@/service/scheduleService";
 import { sectionsApi, doctorsApi, locationsApi, Section, Doctor, Location } from "@/services/api";
 import api from "@/services/api";
+import { describeWhatsAppReminderWindowRo } from "@/utils/appointmentDateTime";
 
 dayjs.extend(utc);
 
@@ -1191,6 +1192,71 @@ export default function AppointmentAddEdit({
                       )}
                     </Field>
                   </div>
+
+                  {/* Când se trimite reminderul WhatsApp (confirmare) */}
+                  {(() => {
+                    const dateStr = values.date || formattedDate;
+                    if (values.isConfirmed) {
+                      return (
+                        <div className="flex gap-3 rounded-lg border border-gray-200 bg-gray-50/80 px-3 py-3 text-sm text-gray-600">
+                          <MessageCircle className="h-5 w-5 shrink-0 text-gray-400 mt-0.5" aria-hidden />
+                          <div>
+                            <p className="font-semibold text-gray-800">
+                              Reminder WhatsApp
+                            </p>
+                            <p className="mt-1 text-xs leading-relaxed">
+                              Pentru <span className="font-medium">Rezervare închisă</span> nu se programează trimiterea automată a mesajului WhatsApp de confirmare.
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    }
+                    if (!values.time?.trim()) {
+                      return (
+                        <div className="flex gap-3 rounded-lg border border-dashed border-emerald-200 bg-emerald-50/50 px-3 py-3 text-sm text-emerald-900/80">
+                          <MessageCircle className="h-5 w-5 shrink-0 text-emerald-600 mt-0.5" aria-hidden />
+                          <div>
+                            <p className="font-semibold text-emerald-900">
+                              Reminder WhatsApp
+                            </p>
+                            <p className="mt-1 text-xs leading-relaxed">
+                              Selectați ora programării pentru a vedea fereastra în care poate fi trimis mesajul de confirmare pe WhatsApp.
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    }
+                    const preview = describeWhatsAppReminderWindowRo({
+                      date: dateStr,
+                      time: values.time,
+                    });
+                    if (!preview) {
+                      return (
+                        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900">
+                          <p className="font-semibold">Reminder WhatsApp</p>
+                          <p className="mt-1 text-xs">
+                            Nu s-a putut calcula fereastra de trimitere pentru data și ora selectate.
+                          </p>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="flex gap-3 rounded-lg border border-emerald-200 bg-emerald-50/80 px-3 py-3 text-sm text-emerald-950">
+                        <MessageCircle className="h-5 w-5 shrink-0 text-emerald-600 mt-0.5" aria-hidden />
+                        <div className="min-w-0">
+                          <p className="font-semibold text-emerald-900">
+                            Când se trimite mesajul WhatsApp de confirmare
+                          </p>
+                          <p className="mt-2 text-sm font-medium text-emerald-900">
+                            {preview.headline}
+                          </p>
+                          <p className="mt-1.5 text-xs leading-relaxed text-emerald-900/85">
+                            {preview.detail}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Action Buttons */}
                   <div className="flex gap-3 pt-3 border-t">

@@ -7,6 +7,7 @@ import { requireAuth } from "@/utils/authHelpers";
 import { appointmentToZonedDateTime, DEFAULT_TIMEZONE } from "@/utils/appointmentDateTime";
 import {
   normalizePhoneNumberToE164RO,
+  resolveWhatsAppDoctorForSection,
   sendWhatsAppReminder,
 } from "@/utils/whatsappMeta";
 
@@ -66,19 +67,23 @@ export async function POST(
     appointment.confirmationTokenExpiresAt = null;
     await appointment.save();
 
+    const sectionLabel = appointment.section?.name || appointment.testType || "-";
+    const doctorRaw = appointment.doctor?.name || appointment.doctorName || "-";
+    const doctorForMessage = resolveWhatsAppDoctorForSection(sectionLabel, doctorRaw);
+
     const message = await sendWhatsAppReminder({
       toPhoneNumberRaw: appointment.phoneNumber,
       customerName: appointment.patientName,
-      section: appointment.section?.name || appointment.testType || "-",
-      doctor: appointment.doctor?.name || appointment.doctorName || "-",
+      section: sectionLabel,
+      doctor: doctorRaw,
       appointmentDateText: apptDt.format("DD.MM.YYYY"),
       appointmentTimeText: apptDt.format("HH:mm"),
     });
 
     const outboundPreview =
       `Template reminder pentru ${appointment.patientName || "Pacient"}: ` +
-      `${appointment.section?.name || appointment.testType || "-"}, ` +
-      `${appointment.doctor?.name || appointment.doctorName || "-"}, ` +
+      `${sectionLabel}, ` +
+      `${doctorForMessage}, ` +
       `${apptDt.format("DD.MM.YYYY")} ${apptDt.format("HH:mm")}`;
 
     appointment.whatsAppReminderStatus = "sent";

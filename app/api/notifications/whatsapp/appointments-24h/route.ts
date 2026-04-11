@@ -11,8 +11,11 @@ import {
 } from "@/utils/appointmentDateTime";
 import {
   normalizePhoneNumberToE164RO,
+  resolveWhatsAppDoctorForSection,
   sendWhatsAppReminder,
 } from "@/utils/whatsappMeta";
+
+const CRON_LOG = "[cron:whatsapp-appointments-24h]";
 
 function isAuthorized(request: NextRequest): boolean {
   const secret = process.env.REMINDER_CRON_SECRET;
@@ -25,8 +28,10 @@ function isAuthorized(request: NextRequest): boolean {
 }
 
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now();
   try {
     if (!isAuthorized(request)) {
+      console.warn(`${CRON_LOG} rejected: unauthorized (missing or invalid secret)`);
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
     }
 
@@ -102,19 +107,23 @@ export async function POST(request: NextRequest) {
           },
         });
 
+        const sectionLabel = a.section?.name || a.testType || "-";
+        const doctorRaw = a.doctor?.name || a.doctorName || "-";
+        const doctorForMessage = resolveWhatsAppDoctorForSection(sectionLabel, doctorRaw);
+
         const message = await sendWhatsAppReminder({
           toPhoneNumberRaw: a.phoneNumber,
           customerName: a.patientName,
-          section: a.section?.name || a.testType || "-",
-          doctor: a.doctor?.name || a.doctorName || "-",
+          section: sectionLabel,
+          doctor: doctorRaw,
           appointmentDateText: apptDt.format("DD.MM.YYYY"),
           appointmentTimeText: apptDt.format("HH:mm"),
         });
 
         const outboundPreview =
           `Template reminder pentru ${a.patientName || "Pacient"}: ` +
-          `${a.section?.name || a.testType || "-"}, ` +
-          `${a.doctor?.name || a.doctorName || "-"}, ` +
+          `${sectionLabel}, ` +
+          `${doctorForMessage}, ` +
           `${apptDt.format("DD.MM.YYYY")} ${apptDt.format("HH:mm")}`;
 
         await AppointModel.findByIdAndUpdate(a._id, {
@@ -146,7 +155,14 @@ export async function POST(request: NextRequest) {
         sent += 1;
       } catch (e: any) {
         failed += 1;
-        errors.push({ appointmentId: String(a._id), error: e?.message ?? "Unknown error" });
+        const errMsg = e?.message ?? "Unknown error";
+        errors.push({ appointmentId: String(a._id), error: errMsg });
+        console.error(`${CRON_LOG} send failed`, {
+          appointmentId: String(a._id),
+          patientName: a.patientName ?? null,
+          error: errMsg,
+          stack: e?.stack ?? null,
+        });
         await AppointModel.findByIdAndUpdate(a._id, {
           $set: {
             whatsAppReminderStatus: "failed",
@@ -160,7 +176,12 @@ export async function POST(request: NextRequest) {
       { status: 200 }
     );
   } catch (err: any) {
-    console.error("POST /api/notifications/whatsapp/appointments-24h error:", err);
+    const durationMs = Date.now() - startedAt;
+    console.error(`${CRON_LOG} fatal error after ${durationMs}ms`, {
+      message: err?.message,
+      stack: err?.stack,
+    });
+    console.error(err);
     return NextResponse.json(
       { success: false, message: err?.message ?? "Server Error" },
       { status: 500 }

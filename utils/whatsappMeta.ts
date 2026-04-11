@@ -124,6 +124,16 @@ function buildReminderText(params: {
   );
 }
 
+/** Pentru secția Ecografie, mesajul WhatsApp folosește mereu acest medic. */
+const ECOGRAFIE_WHATSAPP_DOCTOR_NAME = "Călin Moș";
+
+export function resolveWhatsAppDoctorForSection(section: string, doctor: string): string {
+  if (section.trim().toLowerCase() === "ecografie") {
+    return ECOGRAFIE_WHATSAPP_DOCTOR_NAME;
+  }
+  return doctor;
+}
+
 export async function sendWhatsAppReminder(params: {
   toPhoneNumberRaw: string;
   customerName?: string;
@@ -133,6 +143,7 @@ export async function sendWhatsAppReminder(params: {
   appointmentTimeText: string;
 }): Promise<{ sid: string; to: string }> {
   const env = getMetaEnv();
+  const doctorForMessage = resolveWhatsAppDoctorForSection(params.section, params.doctor);
   const e164 = normalizePhoneNumberToE164RO(params.toPhoneNumberRaw);
   if (!e164) {
     throw new Error(`Invalid phone number: ${params.toPhoneNumberRaw}`);
@@ -174,7 +185,7 @@ export async function sendWhatsAppReminder(params: {
               {
                 type: "text",
                 parameter_name: "doctor",
-                text: params.doctor,
+                text: doctorForMessage,
               },
               {
                 type: "text",
@@ -232,7 +243,7 @@ export async function sendWhatsAppReminder(params: {
       type: "text",
       text: {
         preview_url: false,
-        body: buildReminderText(params),
+        body: buildReminderText({ ...params, doctor: doctorForMessage }),
       },
     };
     const { response, data } = await sendMetaRequest(endpoint, env.accessToken, payload);
