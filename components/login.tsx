@@ -4,10 +4,12 @@ import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import api from "@/services/api";
 import * as Yup from "yup";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { useUserStore } from "@/store/store";
-import { setToken } from "@/utils/tokenStorage";
+import { getToken, setToken } from "@/utils/tokenStorage";
+import { isTokenExpiredSync, decodeJwtPayloadUnsafe } from "@/utils/jwtUtils";
+import axios from "axios";
 import { Eye, EyeOff } from "lucide-react";
 import { copy } from "@/lib/copy";
 
@@ -39,6 +41,81 @@ const SignIn = () => {
   const redirectParam = searchParams.get("redirect");
   const sessionParam = searchParams.get("session");
   const showSessionExpired = sessionParam === "expired" || sessionParam === "invalid";
+
+  // If the user already has a valid session (access token or refresh cookie), skip the login form.
+  useEffect(() => {
+    if (sessionParam === "expired" || sessionParam === "invalid") {
+      return;
+    }
+
+    let cancelled = false;
+
+    const resolveTargetPath = (accessToken: string): string => {
+      if (redirectParam && isRedirectAllowed(redirectParam)) {
+        return decodeURIComponent(redirectParam);
+      }
+      const { user: storedUser } = useUserStore.getState();
+      if (storedUser?.role === "doctor") {
+        return "/doctor";
+      }
+      const claims = decodeJwtPayloadUnsafe<{ role?: string }>(accessToken);
+      if (claims?.role === "doctor") {
+        return "/doctor";
+      }
+      return "/dashboard";
+    };
+
+    const tryRefresh = async (): Promise<string | null> => {
+      try {
+        const response = await axios.post("/api/auth/refresh", {}, { withCredentials: true });
+        if (cancelled) return null;
+        const accessToken = response.data?.accessToken as string | undefined;
+        if (accessToken) {
+          setToken(accessToken);
+          return accessToken;
+        }
+      } catch {
+        /* stay on login */
+      }
+      return null;
+    };
+
+    (async () => {
+      let token = getToken();
+
+      if (token && isTokenExpiredSync(token)) {
+        const refreshed = await tryRefresh();
+        if (refreshed) token = refreshed;
+      }
+
+      if (!token) {
+        token = await tryRefresh();
+      }
+
+      if (!token || isTokenExpiredSync(token)) {
+        return;
+      }
+
+      await new Promise<void>((resolve) => {
+        if (useUserStore.persist.hasHydrated()) {
+          resolve();
+          return;
+        }
+        const unsub = useUserStore.persist.onFinishHydration(() => {
+          unsub();
+          resolve();
+        });
+      });
+
+      if (cancelled) return;
+
+      router.replace(resolveTargetPath(token));
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router, sessionParam, redirectParam]);
 
   const handleSubmit = async (values: any) => {
     try {

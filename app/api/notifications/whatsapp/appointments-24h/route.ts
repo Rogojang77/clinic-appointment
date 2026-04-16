@@ -58,8 +58,6 @@ export async function POST(request: NextRequest) {
     const candidates = await AppointModel.find({
       date: { $gte: dateStart, $lte: dateEnd },
       whatsAppReminderStatus: { $ne: "sent" },
-      // Skip already confirmed appointments
-      isConfirmed: { $ne: true },
       $or: [inScheduledWindow, legacyNoStoredWindow],
     })
       .sort({ date: 1, time: 1 })

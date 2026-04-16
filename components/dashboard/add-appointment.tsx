@@ -1196,21 +1196,6 @@ export default function AppointmentAddEdit({
                   {/* Când se trimite reminderul WhatsApp (confirmare) */}
                   {(() => {
                     const dateStr = values.date || formattedDate;
-                    if (values.isConfirmed) {
-                      return (
-                        <div className="flex gap-3 rounded-lg border border-gray-200 bg-gray-50/80 px-3 py-3 text-sm text-gray-600">
-                          <MessageCircle className="h-5 w-5 shrink-0 text-gray-400 mt-0.5" aria-hidden />
-                          <div>
-                            <p className="font-semibold text-gray-800">
-                              Reminder WhatsApp
-                            </p>
-                            <p className="mt-1 text-xs leading-relaxed">
-                              Pentru <span className="font-medium">Rezervare închisă</span> nu se programează trimiterea automată a mesajului WhatsApp de confirmare.
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    }
                     if (!values.time?.trim()) {
                       return (
                         <div className="flex gap-3 rounded-lg border border-dashed border-emerald-200 bg-emerald-50/50 px-3 py-3 text-sm text-emerald-900/80">

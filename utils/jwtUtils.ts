@@ -126,6 +126,30 @@ export async function createJWT(payload: Omit<JWTPayload, 'iat' | 'exp'>): Promi
 }
 
 /**
+ * Decode JWT payload (middle segment) without signature verification.
+ * JWT uses base64url encoding; plain atob() on the raw segment often fails or mis-decodes.
+ */
+export function decodeJwtPayloadUnsafe<T = Record<string, unknown>>(token: string): T | null {
+  try {
+    if (!token || typeof token !== 'string') {
+      return null;
+    }
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      return null;
+    }
+    const base64url = parts[1];
+    const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+    const pad = base64.length % 4;
+    const padded = pad ? base64 + '='.repeat(4 - pad) : base64;
+    const json = atob(padded);
+    return JSON.parse(json) as T;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Checks if a token is expired without full verification
  * Useful for client-side checks
  * @param token - The JWT token to check
@@ -137,16 +161,8 @@ export function isTokenExpiredSync(token: string): boolean {
       return true;
     }
 
-    const parts = token.split('.');
-    if (parts.length !== 3) {
-      return true;
-    }
-
-    let payload;
-    try {
-      payload = JSON.parse(atob(parts[1]));
-    } catch (parseError) {
-      // Invalid base64 or JSON in token payload
+    const payload = decodeJwtPayloadUnsafe<{ exp?: number }>(token);
+    if (!payload) {
       return true;
     }
     const expirationDate = payload.exp;
@@ -157,7 +173,7 @@ export function isTokenExpiredSync(token: string): boolean {
 
     // Check if token is expired (with 5 second buffer for clock skew)
     return expirationDate * 1000 < Date.now() - 5000;
-  } catch (error) {
+  } catch {
     return true;
   }
 }

@@ -127,8 +127,7 @@ export async function POST(request: NextRequest) {
 
     const date = dayjs(dateInput).isValid() ? dayjs(dateInput).startOf("day").toDate() : new Date(dateInput);
     const confirmed = !!isConfirmed;
-    const windowBounds =
-      !confirmed ? computeWhatsAppReminderWindowBounds({ date, time }) : null;
+    const windowBounds = computeWhatsAppReminderWindowBounds({ date, time });
 
     const doc = await AppointModel.create({
       location,
@@ -268,31 +267,35 @@ export async function PATCH(request: NextRequest) {
       update.day = weekdayRoFromYmd(ymd);
     }
 
-    const nextIsConfirmed =
-      update.isConfirmed !== undefined ? !!update.isConfirmed : appointment.isConfirmed;
     const becameUnconfirmed =
       update.isConfirmed === false && appointment.isConfirmed === true;
+    const confirmationChanged =
+      update.isConfirmed !== undefined &&
+      !!update.isConfirmed !== !!appointment.isConfirmed;
 
     const effectiveDate = (update.date as Date | undefined) ?? appointment.date;
     const effectiveTime = (update.time as string | undefined) ?? appointment.time;
 
-    if (nextIsConfirmed) {
-      update.whatsAppReminderWindowStart = null;
-      update.whatsAppReminderWindowEnd = null;
-    } else {
-      const dateOrTimeChanged =
-        update.date !== undefined || update.time !== undefined;
-      if (dateOrTimeChanged || becameUnconfirmed) {
-        const bounds = computeWhatsAppReminderWindowBounds({
-          date: effectiveDate,
-          time: effectiveTime,
-        });
-        update.whatsAppReminderWindowStart = bounds?.start ?? null;
-        update.whatsAppReminderWindowEnd = bounds?.end ?? null;
-        update.whatsAppReminderStatus = "not_sent";
-        update.whatsAppReminderSentAt = null;
-        update.whatsAppReminderMessageSid = null;
-      }
+    const dateOrTimeChanged =
+      update.date !== undefined || update.time !== undefined;
+
+    if (dateOrTimeChanged || becameUnconfirmed) {
+      const bounds = computeWhatsAppReminderWindowBounds({
+        date: effectiveDate,
+        time: effectiveTime,
+      });
+      update.whatsAppReminderWindowStart = bounds?.start ?? null;
+      update.whatsAppReminderWindowEnd = bounds?.end ?? null;
+      update.whatsAppReminderStatus = "not_sent";
+      update.whatsAppReminderSentAt = null;
+      update.whatsAppReminderMessageSid = null;
+    } else if (confirmationChanged) {
+      const bounds = computeWhatsAppReminderWindowBounds({
+        date: effectiveDate,
+        time: effectiveTime,
+      });
+      update.whatsAppReminderWindowStart = bounds?.start ?? null;
+      update.whatsAppReminderWindowEnd = bounds?.end ?? null;
     }
 
     const updated = await AppointModel.findByIdAndUpdate(
