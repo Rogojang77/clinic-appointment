@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Edit, Trash, Loader, MessageCircle } from "lucide-react";
+import { Edit, Trash, Loader, MessageCircle, Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -14,6 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import toast from "react-hot-toast";
 import api from "@/services/api";
 import isDateValid from "@/utils/isValidDate";
+import { buildTableRowsWithFreeSlots } from "@/utils/dashboardSlotRows";
 
 interface Appointment {
   _id: string;
@@ -50,6 +51,12 @@ interface TableComponentProps {
   onEdit: (appointment: Appointment) => void;
   fetchData: () => void;
   selectedTestType?: string | null;
+  /** Ore din program (DB) pentru care se pot afișa rânduri „Liber” */
+  allowedSlotTimes?: string[];
+  /** Deschide formularul de adăugare cu ora slotului (rândurile libere) */
+  onAddAtFreeSlot?: (slotTime: string) => void;
+  /** false pentru date în trecut sau fără permisiune */
+  canAddAtFreeSlot?: boolean;
 }
 
 const TableComponent: React.FC<TableComponentProps> = ({
@@ -57,6 +64,9 @@ const TableComponent: React.FC<TableComponentProps> = ({
   onEdit,
   fetchData,
   selectedTestType,
+  allowedSlotTimes = [],
+  onAddAtFreeSlot,
+  canAddAtFreeSlot = false,
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -174,13 +184,27 @@ const TableComponent: React.FC<TableComponentProps> = ({
   };
 
   const renderTable = (appointmentsToRender: Appointment[], title?: string) => {
-    const sortedData = sortData(appointmentsToRender);
-
-    if (appointmentsToRender.length === 0) {
-      return null;
-    }
-
     const isEcografie = selectedTestType === "Ecografie";
+    /** Fără sortare pe coloane: programări + sloturi goale doar la orele din program (DB); la sortare rămân doar programările. */
+    const useFreeSlotGrid = !sortField || sortField === "time";
+    const displayRows = useFreeSlotGrid
+      ? buildTableRowsWithFreeSlots(appointmentsToRender, {
+          allowedSlotTimes,
+        })
+      : sortData(appointmentsToRender).map((a) => ({
+          type: "appointment" as const,
+          appointment: a,
+        }));
+
+    if (displayRows.length === 0) {
+      return (
+        <div className="bg-white shadow rounded-lg">
+          <div className="px-4 py-5 sm:p-6 text-center">
+            <p className="text-gray-500 font-medium text-lg">Nicio programare pentru această dată/locație.</p>
+          </div>
+        </div>
+      );
+    }
     
     const getStatusBadge = (appointment: Appointment) => {
       const decision = appointment.patientDecision;
@@ -272,7 +296,50 @@ const TableComponent: React.FC<TableComponentProps> = ({
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {sortedData.map((appointment, index) => {
+                {displayRows.map((row, index) => {
+                  if (row.type === "free") {
+                    const canQuickAdd = Boolean(
+                      onAddAtFreeSlot && canAddAtFreeSlot
+                    );
+                    return (
+                      <tr
+                        key={`free-${row.slotTime}`}
+                        className="bg-red-200/95 hover:bg-red-200/90 transition-colors"
+                        title={
+                          canQuickAdd
+                            ? "Adaugă programare la acest orar"
+                            : "Interval liber 15 min — adaugă o programare cu «Adaugă rând»"
+                        }
+                      >
+                        <td className="px-6 py-3 text-sm text-red-800/80">—</td>
+                        <td className="px-6 py-3 text-sm text-red-800/60">
+                          {canQuickAdd ? (
+                            <button
+                              type="button"
+                              onClick={() => onAddAtFreeSlot!(row.slotTime)}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-red-900 bg-white/50 hover:bg-red-100 border border-red-300/60 shadow-sm"
+                              title="Adaugă programare"
+                              aria-label={`Adaugă programare la ${row.slotTime}`}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </button>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td className="px-6 py-3 whitespace-nowrap text-sm font-mono text-red-900">
+                          {row.slotTime}
+                        </td>
+                        <td className="px-6 py-3 text-sm text-red-900/90 italic">Liber</td>
+                        <td className="px-6 py-3 text-sm text-red-800/70">—</td>
+                        <td className="px-6 py-3 text-sm text-red-800/70">—</td>
+                        <td className="px-6 py-3 text-sm text-red-800/70">—</td>
+                        <td className="px-6 py-3 text-sm text-red-800/70">—</td>
+                      </tr>
+                    );
+                  }
+
+                  const appointment = row.appointment;
                   const isWhatsAppSent =
                     appointment.whatsAppReminderStatus === "sent" ||
                     !!sentById[appointment._id];
@@ -386,15 +453,7 @@ const TableComponent: React.FC<TableComponentProps> = ({
 
   return (
     <div className="lg:px-10 px-5 mb-5">
-      {appointments?.length > 0 ? (
-        renderTable(appointments || [])
-      ) : (
-        <div className="bg-white shadow rounded-lg">
-          <div className="px-4 py-5 sm:p-6 text-center">
-            <p className="text-gray-500 font-medium text-lg">Nicio programare pentru această dată/locație.</p>
-          </div>
-        </div>
-      )}
+      {renderTable(appointments || [])}
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>

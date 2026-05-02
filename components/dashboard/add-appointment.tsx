@@ -233,6 +233,8 @@ interface AppointmentAddEditProps {
   fetchAppointments: () => void;
   appointments?: any;
   selectedTestType?: string | null;
+  /** Când e deschis fără edit: precompletează ora (ex. click + pe rândul liber) */
+  defaultTimeOnAdd?: string | null;
 }
 
 export default function AppointmentAddEdit({
@@ -246,6 +248,7 @@ export default function AppointmentAddEdit({
   fetchAppointments,
   appointments,
   selectedTestType,
+  defaultTimeOnAdd = null,
 }: AppointmentAddEditProps) {
   const [customTime, setCustomTime] = useState("");
   const [selectTime, setSelectTime] = useState({
@@ -672,29 +675,57 @@ export default function AppointmentAddEdit({
     }
   }, [selectedSection, location, day, date, isModalOpen, fetchTimeSlots]);
 
-  // Initialize customTime and showTimeSelector when editing existing appointment
+  // Initialize customTime and showTimeSelector (edit) sau reset / prefill oră (add)
   useEffect(() => {
-    if (data?.time && isModalOpen) {
-      // Check if the time exists in predefined slots
-      const timeExistsInSlots = timeSlots.length > 0 && timeSlots.some((slot: any) => slot.time === data.time);
-      
+    if (!isModalOpen) {
+      return;
+    }
+    if (data?.time) {
+      const timeExistsInSlots =
+        timeSlots.length > 0 &&
+        timeSlots.some((slot: any) => slot.time === data.time);
+
       if (timeExistsInSlots) {
-        // If time exists in slots, use predefined selector
         setCustomTime("");
         setShowTimeSelector(false);
         setSelectTime({ time: data.time, date: formattedDate });
       } else {
-        // If time doesn't exist in slots (or slots not loaded yet), it's a custom time
         setCustomTime(data.time);
         setShowTimeSelector(true);
       }
-    } else if (!data && isModalOpen) {
-      // Reset when creating new appointment
-      setCustomTime("");
-      setShowTimeSelector(false);
-      setSelectTime({ time: "", date: "" });
+      return;
     }
-  }, [data, isModalOpen, timeSlots, formattedDate]);
+
+    if (defaultTimeOnAdd) {
+      const setF = setFieldValueRef.current;
+      if (timeSlots.length === 0) {
+        setF?.("time", defaultTimeOnAdd);
+        setF?.("timeType", "custom");
+        setCustomTime(defaultTimeOnAdd);
+        setShowTimeSelector(true);
+        setSelectTime({ time: "", date: "" });
+        return;
+      }
+      const inSlots = timeSlots.some((slot: any) => slot.time === defaultTimeOnAdd);
+      setF?.("time", defaultTimeOnAdd);
+      if (inSlots) {
+        setF?.("timeType", "select");
+        setCustomTime("");
+        setShowTimeSelector(false);
+        setSelectTime({ time: defaultTimeOnAdd, date: formattedDate });
+      } else {
+        setF?.("timeType", "custom");
+        setCustomTime(defaultTimeOnAdd);
+        setShowTimeSelector(true);
+        setSelectTime({ time: "", date: "" });
+      }
+      return;
+    }
+
+    setCustomTime("");
+    setShowTimeSelector(false);
+    setSelectTime({ time: "", date: "" });
+  }, [data, isModalOpen, timeSlots, formattedDate, defaultTimeOnAdd]);
 
   return (
     <div className="w-full overflow-auto">
@@ -712,9 +743,20 @@ export default function AppointmentAddEdit({
             <Formik
               enableReinitialize={true}
               initialValues={{
-                timeType: data?.time && !timeSlots.some((slot: any) => slot.time === data.time) ? "custom" : "select",
+                timeType: (() => {
+                  if (data?.time) {
+                    return timeSlots.some((slot: any) => slot.time === data.time) ? "select" : "custom";
+                  }
+                  if (defaultTimeOnAdd) {
+                    if (timeSlots.length === 0) {
+                      return "custom";
+                    }
+                    return timeSlots.some((slot: any) => slot.time === defaultTimeOnAdd) ? "select" : "custom";
+                  }
+                  return "select";
+                })(),
                 date: data?.date || formattedDate,
-                time: data?.time || "",
+                time: data?.time || defaultTimeOnAdd || "",
                 patientName: data?.patientName || "",
                 testType: isEco ? "Ecografie" : (data?.testType || data?.section?.name || selectedTestType || ""),
                 phoneNumber: data?.phoneNumber || "",

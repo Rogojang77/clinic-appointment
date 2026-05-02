@@ -16,9 +16,14 @@ function weekdayRoFromYmd(ymd: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 /**
  * GET /api/appointments
  * Query: date (YYYY-MM-DD), location, sectionId?, testType?
+ * Or: search=... (min. 2 chars) — all appointments, match nume, prenume, telefon; ignores date/location/section/testType
  * Returns { success, data, message }
  */
 export async function GET(request: NextRequest) {
@@ -29,10 +34,66 @@ export async function GET(request: NextRequest) {
     await dbConnect();
 
     const { searchParams } = new URL(request.url);
+    const searchRaw = (searchParams.get("search") ?? "").trim();
     const date = searchParams.get("date");
     const location = searchParams.get("location");
     const sectionId = searchParams.get("sectionId");
     const testType = searchParams.get("testType");
+
+    if (searchRaw.length > 0 && searchRaw.length < 2) {
+      return NextResponse.json({ success: true, data: [] }, { status: 200 });
+    }
+
+    if (searchRaw.length >= 2) {
+      const rx = new RegExp(escapeRegExp(searchRaw), "i");
+      const filter: Record<string, unknown> = {
+        $or: [
+          { patientName: rx },
+          { patientSurname: rx },
+          { phoneNumber: rx },
+        ],
+      };
+      if (authResult.payload.role === "doctor" && authResult.payload.doctorId) {
+        filter.doctorId = authResult.payload.doctorId;
+      }
+
+      const appointments = await AppointModel.find(filter)
+        .populate("sectionId", "name description")
+        .populate("doctorId", "name specialization")
+        .sort({ date: -1, time: -1 })
+        .limit(100)
+        .lean();
+
+      const data = appointments.map((a: any) => ({
+        ...a,
+        _id: a._id.toString(),
+        sectionId: a.sectionId?._id?.toString() ?? a.sectionId,
+        doctorId: a.doctorId?._id?.toString() ?? a.doctorId,
+        section:
+          a.sectionId && typeof a.sectionId === "object"
+            ? {
+                _id: a.sectionId._id?.toString(),
+                name: a.sectionId.name,
+                description: a.sectionId.description,
+              }
+            : undefined,
+        doctor:
+          a.doctorId && typeof a.doctorId === "object"
+            ? {
+                _id: a.doctorId._id?.toString(),
+                name: a.doctorId.name,
+                specialization: a.doctorId.specialization,
+              }
+            : undefined,
+        date: a.date
+          ? typeof a.date === "string"
+            ? a.date
+            : dayjs(a.date).format("YYYY-MM-DD")
+          : undefined,
+      }));
+
+      return NextResponse.json({ success: true, data }, { status: 200 });
+    }
 
     const filter: Record<string, unknown> = {};
     if (date) {

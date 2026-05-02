@@ -22,11 +22,16 @@ import { Loader } from "lucide-react";
 import { dayNameMap } from "@/lib/dayNameMap";
 import Spinner from "../common/loader";
 import Notes from "./Notes";
-import { fetchAppointmentsAPI } from "@/service/appointmentService";
+import {
+  fetchAppointmentsAPI,
+  searchAppointmentsGlobal,
+} from "@/service/appointmentService";
 import { handleDownloadPDF, TestTypeSelectedRefresh } from "@/service/actionService";
 import AddAppointmentButton from "./AddButton";
 import { sectionsApi, locationsApi, Section, Location } from "@/services/api";
 import { useUserStore } from "@/store/store";
+import isDateValid from "@/utils/isValidDate";
+import { fetchTimeSlotsAPI } from "@/service/scheduleService";
 
 const Dashboard = () => {
   useAuthEffect();
@@ -55,6 +60,14 @@ const Dashboard = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [sections, setSections] = useState<Section[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
+  const [searchInput, setSearchInput] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearchLoading, setIsSearchLoading] = useState(false);
+  /** Oră precompletată când utilizatorul apasă + pe un rând liber */
+  const [prefillSlotTime, setPrefillSlotTime] = useState<string | null>(null);
+  /** Orele din program (același set ca la formular) — rândurile roșii „Liber” doar aici */
+  const [allowedSlotTimes, setAllowedSlotTimes] = useState<string[]>([]);
 
 
   // Map the Normal Day with Romania Day name ...
@@ -325,23 +338,127 @@ const Dashboard = () => {
 
   // Handle Edit Function ...
   const handleEdit = async (appointment: any) => {
-    if (!selectedDate) {
-      alert(`Vă rugăm să selectați data.`);
-    } else {
-      await setEditData(appointment);
-      setIsModalOpen(true);
+    if (appointment?.date) {
+      const d = dayjs(appointment.date);
+      if (d.isValid()) {
+        setSelectedDate(d);
+      }
+    } else if (!selectedDate) {
+      alert("Vă rugăm să selectați data.");
+      return;
     }
+    if (appointment?.location) {
+      setLocation(appointment.location);
+    }
+    setPrefillSlotTime(null);
+    setEditData(appointment);
+    setIsModalOpen(true);
   };
 
   // Modal Actions ........................
   const handleModal = () => {
     setIsModalOpen(false);
     setEditData(null);
+    setPrefillSlotTime(null);
   };
 
   const handleAddAppointment = () => {
+    setEditData(null);
+    setPrefillSlotTime(null);
     setIsModalOpen(true);
   };
+
+  const handleAddFromFreeSlot = (slotTime: string) => {
+    if (!selectedDate) {
+      alert("Vă rugăm să selectați data.");
+      return;
+    }
+    const dateStr = selectedDate.format("YYYY-MM-DD");
+    if (!isDateValid(dateStr)) {
+      return;
+    }
+    setEditData(null);
+    setPrefillSlotTime(slotTime);
+    setIsModalOpen(true);
+  };
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(searchInput.trim());
+    }, 400);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
+  useEffect(() => {
+    if (debouncedSearch.length < 2) {
+      setSearchResults([]);
+      setIsSearchLoading(false);
+      return;
+    }
+    let active = true;
+    setIsSearchLoading(true);
+    searchAppointmentsGlobal(debouncedSearch)
+      .then((res) => {
+        if (active) setSearchResults(res);
+      })
+      .catch(() => {
+        if (active) {
+          setSearchResults([]);
+          toast.error("Căutarea a eșuat.");
+        }
+      })
+      .finally(() => {
+        if (active) setIsSearchLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [debouncedSearch]);
+
+  useEffect(() => {
+    if (!location || !selectDay || !selectedDate) {
+      setAllowedSlotTimes([]);
+      return;
+    }
+    const testType = selectedTestType || "Ecografie";
+    let sectionId: string | undefined;
+    if (sections.length > 0) {
+      const match = sections.find((section: any) => section.name === testType);
+      if (match?._id) {
+        sectionId = String(match._id);
+      }
+    }
+    const dateStr = selectedDate.format("YYYY-MM-DD");
+    let cancelled = false;
+    (async () => {
+      try {
+        const slots = await fetchTimeSlotsAPI(
+          location,
+          selectDay,
+          dateStr,
+          sectionId,
+          sectionId ? undefined : testType
+        );
+        if (cancelled) return;
+        setAllowedSlotTimes(
+          (slots || []).map((s: { time: string }) => s.time)
+        );
+      } catch (e) {
+        console.error("Error loading schedule for dashboard grid:", e);
+        if (!cancelled) {
+          setAllowedSlotTimes([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [location, selectDay, selectedDate, selectedTestType, sections]);
+
+  const scheduleDateStr = selectedDate?.format("YYYY-MM-DD") ?? "";
+  const canAddAtFreeSlot = Boolean(
+    scheduleDateStr && isDateValid(scheduleDateStr)
+  );
 
   // Show initial loading state while locations are being fetched
   if (isLoadingLocations && locations.length === 0) {
@@ -365,6 +482,73 @@ const Dashboard = () => {
   return (
     <div className="flex flex-col items-center justify-start  bg-gray-200 py-5">
       <div className="w-full max-w-7xl p-5 space-y-4 bg-gray-100 rounded-md shadow-md py-5 ">
+        <div className="w-full space-y-2 mb-1">
+          <label htmlFor="dashboard-global-search">
+            Caută programări
+          </label>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+            <input
+              id="dashboard-global-search"
+              type="search"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Caută în toate programările: nume, prenume, telefon (min. 2 caractere)…"
+              className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-500"
+              autoComplete="off"
+            />
+            {isSearchLoading && (
+              <Loader className="h-5 w-5 shrink-0 animate-spin text-indigo-600" />
+            )}
+          </div>
+          {debouncedSearch.length >= 2 &&
+            !isSearchLoading &&
+            searchResults.length === 0 && (
+              <p className="text-sm text-gray-600">Nicio programare găsită.</p>
+            )}
+          {searchResults.length > 0 && (
+            <ul
+              className="max-h-64 overflow-y-auto rounded-md border border-gray-200 bg-white shadow-sm divide-y divide-gray-100"
+              role="list"
+            >
+              {searchResults.map((apt) => {
+                const nameLine = [apt.patientName, apt.patientSurname]
+                  .filter(Boolean)
+                  .join(" ")
+                  .trim();
+                return (
+                  <li key={apt._id}>
+                    <button
+                      type="button"
+                      className="w-full text-left px-3 py-2.5 text-sm hover:bg-indigo-50 focus:bg-indigo-50 focus:outline-none"
+                      onClick={() => {
+                        setSearchInput("");
+                        setDebouncedSearch("");
+                        setSearchResults([]);
+                        handleEdit(apt);
+                      }}
+                    >
+                      <div className="font-medium text-gray-900">
+                        {nameLine || apt.patientName || "—"}{" "}
+                        <span className="font-normal text-gray-600">
+                          · {apt.phoneNumber || "—"}
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-500 mt-0.5">
+                        {apt.date && dayjs(apt.date).isValid()
+                          ? dayjs(apt.date).format("D MMM YYYY")
+                          : "—"}{" "}
+                        {apt.time ? `· ${apt.time}` : ""} · {apt.location || "—"}
+                        {apt.section?.name || apt.testType
+                          ? ` · ${apt.section?.name || apt.testType}`
+                          : ""}
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
         <div className="flex justify-between ">
           <p>Listă secții:</p>
           <div className="flex items-center gap-2">
@@ -469,6 +653,9 @@ const Dashboard = () => {
             onEdit={handleEdit}
             fetchData={fetchAppointments}
             selectedTestType={selectedTestType}
+            allowedSlotTimes={allowedSlotTimes}
+            onAddAtFreeSlot={handleAddFromFreeSlot}
+            canAddAtFreeSlot={canAddAtFreeSlot}
           />
         )}
 
@@ -490,6 +677,7 @@ const Dashboard = () => {
         fetchAppointments={fetchAppointments}
         data={editData ? editData : null}
         selectedTestType={selectedTestType || "Ecografie"}
+        defaultTimeOnAdd={prefillSlotTime}
       />
 
       {appointmentToDelete && (
