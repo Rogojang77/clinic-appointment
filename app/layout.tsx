@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Navbar from "@/components/nav-bar";
+import Footer from "@/components/footer";
 import { Toaster } from "react-hot-toast";
 
 export const metadata: Metadata = {
@@ -17,7 +18,7 @@ export default function RootLayout({
   return (
     <html lang="ro">
       <body
-        className={` antialiased`}
+        className={`antialiased min-h-screen flex flex-col`}
       >
         <Toaster
           position="top-center"
@@ -27,7 +28,8 @@ export default function RootLayout({
           }}
         />
         <Navbar />
-        {children}
+        <main className="flex-1">{children}</main>
+        <Footer />
       </body>
     </html>
   );
