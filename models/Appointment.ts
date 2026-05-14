@@ -57,6 +57,16 @@ AppointmentSchema.index({
   isConfirmed: 1,
 });
 
+// Prevent double-booking the same slot for the same section.
+// Partial index keeps backward compatibility for older docs without sectionId.
+AppointmentSchema.index(
+  { location: 1, date: 1, time: 1, sectionId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { sectionId: { $exists: true, $type: "objectId" } },
+  }
+);
+
 export interface IAppointment extends Omit<Appointment, '_id'>, Document {}
 
 const AppointModel = mongoose.models.Appointment || mongoose.model<IAppointment>('Appointment', AppointmentSchema); 

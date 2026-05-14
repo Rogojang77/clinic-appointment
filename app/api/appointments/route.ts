@@ -3,6 +3,7 @@ import dbConnect from "@/utils/mongodb";
 import AppointModel from "@/models/Appointment";
 import { requireAuth } from "@/utils/authHelpers";
 import dayjs from "dayjs";
+import mongoose from "mongoose";
 import { computeWhatsAppReminderWindowBounds } from "@/utils/appointmentDateTime";
 
 function weekdayRoFromYmd(ymd: string): string {
@@ -18,6 +19,60 @@ function weekdayRoFromYmd(ymd: string): string {
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function normalizeScopeValue(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+async function hasSlotConflict(params: {
+  location: string;
+  date: Date;
+  time: string;
+  sectionId?: unknown;
+  testType?: unknown;
+  excludeId?: string;
+}): Promise<boolean> {
+  const { location, date, time, sectionId, testType, excludeId } = params;
+
+  const filter: Record<string, unknown> = {
+    location,
+    date,
+    time,
+  };
+
+  const normalizedSectionId = normalizeScopeValue(sectionId);
+  const normalizedTestType = normalizeScopeValue(testType);
+
+  if (normalizedSectionId) {
+    filter.sectionId = mongoose.Types.ObjectId.isValid(normalizedSectionId)
+      ? new mongoose.Types.ObjectId(normalizedSectionId)
+      : normalizedSectionId;
+  } else if (normalizedTestType) {
+    // Backward compatibility for appointments created before sectionId support.
+    filter.testType = normalizedTestType;
+    filter.$or = [{ sectionId: { $exists: false } }, { sectionId: null }];
+  } else {
+    return false;
+  }
+
+  if (excludeId) {
+    filter._id = { $ne: excludeId };
+  }
+
+  const conflict = await AppointModel.exists(filter);
+  return !!conflict;
+}
+
+function isMongoDuplicateKeyError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: number }).code === 11000
+  );
 }
 
 /**
@@ -190,6 +245,23 @@ export async function POST(request: NextRequest) {
     const confirmed = !!isConfirmed;
     const windowBounds = computeWhatsAppReminderWindowBounds({ date, time });
 
+    const conflictExists = await hasSlotConflict({
+      location,
+      date,
+      time,
+      sectionId,
+      testType,
+    });
+    if (conflictExists) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Slotul este deja ocupat pentru această secție.",
+        },
+        { status: 409 }
+      );
+    }
+
     const doc = await AppointModel.create({
       location,
       date,
@@ -225,6 +297,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, data: out }, { status: 201 });
   } catch (err) {
     console.error("POST /api/appointments error:", err);
+    if (isMongoDuplicateKeyError(err)) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Slotul este deja ocupat pentru această secție.",
+        },
+        { status: 409 }
+      );
+    }
     return NextResponse.json(
       { success: false, message: "Server Error" },
       { status: 500 }
@@ -336,6 +417,10 @@ export async function PATCH(request: NextRequest) {
 
     const effectiveDate = (update.date as Date | undefined) ?? appointment.date;
     const effectiveTime = (update.time as string | undefined) ?? appointment.time;
+    const effectiveSectionId =
+      update.sectionId !== undefined ? update.sectionId : appointment.sectionId;
+    const effectiveTestType =
+      update.testType !== undefined ? update.testType : appointment.testType;
 
     const dateOrTimeChanged =
       update.date !== undefined || update.time !== undefined;
@@ -359,6 +444,24 @@ export async function PATCH(request: NextRequest) {
       update.whatsAppReminderWindowEnd = bounds?.end ?? null;
     }
 
+    const conflictExists = await hasSlotConflict({
+      location: appointment.location,
+      date: effectiveDate,
+      time: effectiveTime,
+      sectionId: effectiveSectionId,
+      testType: effectiveTestType,
+      excludeId: id,
+    });
+    if (conflictExists) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Slotul este deja ocupat pentru această secție.",
+        },
+        { status: 409 }
+      );
+    }
+
     const updated = await AppointModel.findByIdAndUpdate(
       id,
       { $set: update },
@@ -380,6 +483,15 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ success: true, data: out }, { status: 200 });
   } catch (err) {
     console.error("PATCH /api/appointments error:", err);
+    if (isMongoDuplicateKeyError(err)) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Slotul este deja ocupat pentru această secție.",
+        },
+        { status: 409 }
+      );
+    }
     return NextResponse.json(
       { success: false, message: "Server Error" },
       { status: 500 }
