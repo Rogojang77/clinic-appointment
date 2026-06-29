@@ -17,7 +17,7 @@ interface LocationSchedule {
 /**
  * GET /api/schedule
  * Get available time slots from the location schedule in MongoDB (bookings filtered per section when sectionId is sent).
- * Query params: location, day, date, sectionId (optional)
+ * Query params: location, day, date, sectionId (optional), doctorId (optional)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -35,6 +35,7 @@ export async function GET(request: NextRequest) {
     const date = searchParams.get("date");
     const sectionId = searchParams.get("sectionId"); // New: section-specific support
     const testType = searchParams.get("testType"); // Fallback for older appointments without sectionId
+    const doctorId = searchParams.get("doctorId");
 
     if (!location || !day) {
       return NextResponse.json(
@@ -50,7 +51,8 @@ export async function GET(request: NextRequest) {
       location,
       day,
       date || undefined,
-      testType || undefined
+      testType || undefined,
+      doctorId || undefined
     );
 
     // Convert to the expected format (backward compatible)

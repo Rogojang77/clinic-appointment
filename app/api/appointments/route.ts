@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import dbConnect from "@/utils/mongodb";
 import AppointModel from "@/models/Appointment";
+import DoctorModel from "@/models/Doctor";
 import { requireAuth } from "@/utils/authHelpers";
 import dayjs from "dayjs";
 import mongoose from "mongoose";
@@ -33,9 +34,10 @@ async function hasSlotConflict(params: {
   time: string;
   sectionId?: unknown;
   testType?: unknown;
+  doctorId?: unknown;
   excludeId?: string;
 }): Promise<boolean> {
-  const { location, date, time, sectionId, testType, excludeId } = params;
+  const { location, date, time, sectionId, testType, doctorId, excludeId } = params;
 
   const filter: Record<string, unknown> = {
     location,
@@ -43,13 +45,19 @@ async function hasSlotConflict(params: {
     time,
   };
 
+  const normalizedDoctorId = normalizeScopeValue(doctorId);
   const normalizedSectionId = normalizeScopeValue(sectionId);
   const normalizedTestType = normalizeScopeValue(testType);
 
-  if (normalizedSectionId) {
+  if (normalizedDoctorId) {
+    filter.doctorId = mongoose.Types.ObjectId.isValid(normalizedDoctorId)
+      ? new mongoose.Types.ObjectId(normalizedDoctorId)
+      : normalizedDoctorId;
+  } else if (normalizedSectionId) {
     filter.sectionId = mongoose.Types.ObjectId.isValid(normalizedSectionId)
       ? new mongoose.Types.ObjectId(normalizedSectionId)
       : normalizedSectionId;
+    filter.$or = [{ doctorId: { $exists: false } }, { doctorId: null }];
   } else if (normalizedTestType) {
     // Backward compatibility for appointments created before sectionId support.
     filter.testType = normalizedTestType;
@@ -66,6 +74,26 @@ async function hasSlotConflict(params: {
   return !!conflict;
 }
 
+function slotConflictMessage(doctorId?: unknown): string {
+  return normalizeScopeValue(doctorId)
+    ? "Slotul este deja ocupat pentru acest medic."
+    : "Slotul este deja ocupat pentru această secție.";
+}
+
+async function sectionHasActiveDoctors(sectionId: unknown): Promise<boolean> {
+  const normalized = normalizeScopeValue(
+    typeof sectionId === "object" && sectionId !== null && "_id" in (sectionId as object)
+      ? String((sectionId as { _id?: unknown })._id)
+      : sectionId
+  );
+  if (!normalized) return false;
+  const oid = mongoose.Types.ObjectId.isValid(normalized)
+    ? new mongoose.Types.ObjectId(normalized)
+    : normalized;
+  const count = await DoctorModel.countDocuments({ sectionId: oid, isActive: true });
+  return count > 0;
+}
+
 function isMongoDuplicateKeyError(error: unknown): boolean {
   return (
     typeof error === "object" &&
@@ -77,7 +105,7 @@ function isMongoDuplicateKeyError(error: unknown): boolean {
 
 /**
  * GET /api/appointments
- * Query: date (YYYY-MM-DD), location, sectionId?, testType?
+ * Query: date (YYYY-MM-DD), location, sectionId?, testType?, doctorId?
  * Or: search=... (min. 2 chars) — all appointments, match nume, prenume, telefon; ignores date/location/section/testType
  * Returns { success, data, message }
  */
@@ -94,6 +122,7 @@ export async function GET(request: NextRequest) {
     const location = searchParams.get("location");
     const sectionId = searchParams.get("sectionId");
     const testType = searchParams.get("testType");
+    const doctorId = searchParams.get("doctorId");
 
     if (searchRaw.length > 0 && searchRaw.length < 2) {
       return NextResponse.json({ success: true, data: [] }, { status: 200 });
@@ -159,6 +188,7 @@ export async function GET(request: NextRequest) {
     if (location) filter.location = location;
     if (sectionId) filter.sectionId = sectionId;
     if (testType) filter.testType = testType;
+    if (doctorId) filter.doctorId = doctorId;
     // Doctors only see their own appointments
     if (authResult.payload.role === "doctor" && authResult.payload.doctorId) {
       filter.doctorId = authResult.payload.doctorId;
@@ -196,6 +226,7 @@ export async function GET(request: NextRequest) {
  * Doctors cannot create appointments.
  */
 export async function POST(request: NextRequest) {
+  let body: any;
   try {
     const authResult = await requireAuth(request);
     if (authResult instanceof NextResponse) return authResult;
@@ -208,7 +239,6 @@ export async function POST(request: NextRequest) {
 
     await dbConnect();
 
-    let body: any;
     try {
       body = await request.json();
     } catch {
@@ -241,6 +271,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const isEcografie = testType === "Ecografie";
+    if (!isEcografie && sectionId) {
+      const hasDoctors = await sectionHasActiveDoctors(sectionId);
+      if (hasDoctors && !normalizeScopeValue(doctorId)) {
+        return NextResponse.json(
+          { success: false, message: "Medicul este obligatoriu." },
+          { status: 400 }
+        );
+      }
+    }
+
     const date = dayjs(dateInput).isValid() ? dayjs(dateInput).startOf("day").toDate() : new Date(dateInput);
     const confirmed = !!isConfirmed;
     const windowBounds = computeWhatsAppReminderWindowBounds({ date, time });
@@ -251,12 +292,13 @@ export async function POST(request: NextRequest) {
       time,
       sectionId,
       testType,
+      doctorId,
     });
     if (conflictExists) {
       return NextResponse.json(
         {
           success: false,
-          message: "Slotul este deja ocupat pentru această secție.",
+          message: slotConflictMessage(doctorId),
         },
         { status: 409 }
       );
@@ -301,7 +343,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          message: "Slotul este deja ocupat pentru această secție.",
+          message: slotConflictMessage(body?.doctorId),
         },
         { status: 409 }
       );
@@ -323,6 +365,7 @@ function isAppointmentDateInPast(date: Date | string): boolean {
  * Body: partial appointment fields. Rejects if appointment date is in the past.
  */
 export async function PATCH(request: NextRequest) {
+  let conflictDoctorId: unknown;
   try {
     const authResult = await requireAuth(request);
     if (authResult instanceof NextResponse) return authResult;
@@ -421,6 +464,21 @@ export async function PATCH(request: NextRequest) {
       update.sectionId !== undefined ? update.sectionId : appointment.sectionId;
     const effectiveTestType =
       update.testType !== undefined ? update.testType : appointment.testType;
+    const effectiveDoctorId =
+      update.doctorId !== undefined ? update.doctorId : appointment.doctorId;
+    conflictDoctorId = effectiveDoctorId;
+
+    const isEcografie =
+      (typeof effectiveTestType === "string" ? effectiveTestType : "") === "Ecografie";
+    if (!isEcografie && effectiveSectionId) {
+      const hasDoctors = await sectionHasActiveDoctors(effectiveSectionId);
+      if (hasDoctors && !normalizeScopeValue(effectiveDoctorId)) {
+        return NextResponse.json(
+          { success: false, message: "Medicul este obligatoriu." },
+          { status: 400 }
+        );
+      }
+    }
 
     const dateOrTimeChanged =
       update.date !== undefined || update.time !== undefined;
@@ -450,13 +508,14 @@ export async function PATCH(request: NextRequest) {
       time: effectiveTime,
       sectionId: effectiveSectionId,
       testType: effectiveTestType,
+      doctorId: effectiveDoctorId,
       excludeId: id,
     });
     if (conflictExists) {
       return NextResponse.json(
         {
           success: false,
-          message: "Slotul este deja ocupat pentru această secție.",
+          message: slotConflictMessage(effectiveDoctorId),
         },
         { status: 409 }
       );
@@ -487,7 +546,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          message: "Slotul este deja ocupat pentru această secție.",
+          message: slotConflictMessage(conflictDoctorId),
         },
         { status: 409 }
       );

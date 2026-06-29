@@ -28,7 +28,7 @@ import {
 } from "@/service/appointmentService";
 import { handleDownloadPDF, TestTypeSelectedRefresh } from "@/service/actionService";
 import AddAppointmentButton from "./AddButton";
-import { sectionsApi, locationsApi, Section, Location } from "@/services/api";
+import { sectionsApi, locationsApi, doctorsApi, Section, Location, Doctor } from "@/services/api";
 import { useUserStore } from "@/store/store";
 import isDateValid from "@/utils/isValidDate";
 import { fetchTimeSlotsAPI } from "@/service/scheduleService";
@@ -68,6 +68,11 @@ const Dashboard = () => {
   const [prefillSlotTime, setPrefillSlotTime] = useState<string | null>(null);
   /** Orele din program (același set ca la formular) — rândurile roșii „Liber” doar aici */
   const [allowedSlotTimes, setAllowedSlotTimes] = useState<string[]>([]);
+  const [sectionDoctors, setSectionDoctors] = useState<Doctor[]>([]);
+  const [selectedDoctorId, setSelectedDoctorId] = useState<string>("");
+  const [isLoadingDoctors, setIsLoadingDoctors] = useState(false);
+
+  const isEcoSection = (selectedTestType || "Ecografie") === "Ecografie";
 
 
   // Map the Normal Day with Romania Day name ...
@@ -106,6 +111,10 @@ const Dashboard = () => {
         filters.sectionId = sectionId;
       }
 
+      if (!isEcoSection && selectedDoctorId) {
+        filters.doctorId = selectedDoctorId;
+      }
+
       // Make GET request with filters
       const data = await fetchAppointmentsAPI(filters);
       setAppointments(data);
@@ -114,7 +123,7 @@ const Dashboard = () => {
       console.error("Error fetching appointments:", error);
       setIsLoading(false);
     }
-  }, [selectedDate, location, selectedTestType, sections]);
+  }, [selectedDate, location, selectedTestType, sections, selectedDoctorId, isEcoSection]);
 
   // Fetch sections from database based on selected location
   const fetchSections = useCallback(async () => {
@@ -289,21 +298,59 @@ const Dashboard = () => {
     }
   }, [location, locations, fetchSections]);
 
+  const fetchSectionDoctors = useCallback(async (sectionId: string) => {
+    try {
+      setIsLoadingDoctors(true);
+      const response = await doctorsApi.getAll({ isActive: true, sectionId });
+      const doctors = response.data.data || [];
+      setSectionDoctors(doctors);
+      setSelectedDoctorId((prev) => {
+        if (prev && doctors.some((d: Doctor) => d._id === prev)) {
+          return prev;
+        }
+        return doctors.length > 0 ? doctors[0]._id : "";
+      });
+    } catch (error) {
+      console.error("Error fetching section doctors:", error);
+      setSectionDoctors([]);
+      setSelectedDoctorId("");
+    } finally {
+      setIsLoadingDoctors(false);
+    }
+  }, []);
+
+  // Load doctors when a non-Ecografie section is selected
+  useEffect(() => {
+    if (isEcoSection || sections.length === 0) {
+      setSectionDoctors([]);
+      setSelectedDoctorId("");
+      return;
+    }
+    const testType = selectedTestType || "Ecografie";
+    const match = sections.find((section: any) => section.name === testType);
+    if (match?._id) {
+      fetchSectionDoctors(String(match._id));
+    } else {
+      setSectionDoctors([]);
+      setSelectedDoctorId("");
+    }
+  }, [selectedTestType, sections, isEcoSection, fetchSectionDoctors]);
+
   // Fetch appointments when dependencies change (only when sections are loaded to get sectionId)
   useEffect(() => {
     if (location && sections.length > 0) {
       fetchAppointments();
     }
-  }, [selectedDate, location, selectedTestType, sections, fetchAppointments]);
+  }, [selectedDate, location, selectedTestType, sections, selectedDoctorId, isEcoSection, fetchAppointments]);
 
 
 
 
   // Handle The Tab Selection ...
   const handleTestTypeSelection = (testType: string | null) => {
-    // Default to "Ecografie" if null is passed
     const finalTestType = testType || "Ecografie";
     setSelectedTestType(finalTestType);
+    setSelectedDoctorId("");
     TestTypeSelectedRefresh(finalTestType);
   };
 
@@ -420,6 +467,10 @@ const Dashboard = () => {
       setAllowedSlotTimes([]);
       return;
     }
+    if (!isEcoSection && sectionDoctors.length > 0 && !selectedDoctorId) {
+      setAllowedSlotTimes([]);
+      return;
+    }
     const testType = selectedTestType || "Ecografie";
     let sectionId: string | undefined;
     if (sections.length > 0) {
@@ -437,7 +488,8 @@ const Dashboard = () => {
           selectDay,
           dateStr,
           sectionId,
-          sectionId ? undefined : testType
+          sectionId ? undefined : testType,
+          !isEcoSection && selectedDoctorId ? selectedDoctorId : undefined
         );
         if (cancelled) return;
         setAllowedSlotTimes(
@@ -453,11 +505,13 @@ const Dashboard = () => {
     return () => {
       cancelled = true;
     };
-  }, [location, selectDay, selectedDate, selectedTestType, sections]);
+  }, [location, selectDay, selectedDate, selectedTestType, sections, selectedDoctorId, isEcoSection, sectionDoctors.length]);
 
   const scheduleDateStr = selectedDate?.format("YYYY-MM-DD") ?? "";
   const canAddAtFreeSlot = Boolean(
-    scheduleDateStr && isDateValid(scheduleDateStr)
+    scheduleDateStr &&
+      isDateValid(scheduleDateStr) &&
+      (isEcoSection || sectionDoctors.length === 0 || Boolean(selectedDoctorId))
   );
 
   // Show initial loading state while locations are being fetched
@@ -599,6 +653,32 @@ const Dashboard = () => {
           ))}
           </div>
         )}
+        {!isEcoSection && (isLoadingDoctors || sectionDoctors.length > 0) && (
+          <div className="w-full">
+            <p className="text-sm font-medium text-gray-700 mb-2">Medici:</p>
+            {isLoadingDoctors ? (
+              <div className="flex justify-center py-2">
+                <Spinner />
+              </div>
+            ) : (
+              <div className="w-full flex flex-wrap justify-start gap-2 mb-3">
+                {sectionDoctors.map((doctor) => (
+                  <div
+                    key={doctor._id}
+                    className={`cursor-pointer flex justify-center items-center py-1 text-white px-4 text-[14px] font-medium rounded-md text-center ${
+                      selectedDoctorId === doctor._id
+                        ? "bg-green-600"
+                        : "bg-slate-500 hover:bg-green-600"
+                    }`}
+                    onClick={() => setSelectedDoctorId(doctor._id)}
+                  >
+                    {doctor.name}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         {isLoadingLocations ? (
           <div className="w-full flex justify-center items-center py-10">
             <Spinner />
@@ -612,12 +692,25 @@ const Dashboard = () => {
           dayName={dayName}
           setDayName={setDayName}
           locations={locations}
+          sidebar={
+            <Notes
+              selectedDate={selectedDate}
+              location={location}
+              textareaContent={textareaContent}
+              setTextareaContent={setTextareaContent}
+            />
+          }
         />
         )}
         <div className="w-full text-center text-[18px] font-semibold py-2 border-t pt-5">
           {location} - {selectDay},{" "}
           {selectedDate?.format("D MMMM YYYY") ||
             "Nu a fost selectată nicio dată"}
+          {!isEcoSection && selectedDoctorId && sectionDoctors.length > 0 && (
+            <span className="block text-sm font-normal text-gray-600 mt-1">
+              {sectionDoctors.find((d) => d._id === selectedDoctorId)?.name}
+            </span>
+          )}
         </div>
         <div className="w-full flex justify-between lg:px-10 px-5 ">
           {user?.role !== "doctor" && (
@@ -658,13 +751,6 @@ const Dashboard = () => {
             canAddAtFreeSlot={canAddAtFreeSlot}
           />
         )}
-
-        <Notes
-          selectedDate={selectedDate}
-          location={location}
-          textareaContent={textareaContent}
-          setTextareaContent={setTextareaContent}
-        />
       </div>
       <AppointmentAddEdit
         isModalOpen={isModalOpen}
@@ -678,6 +764,7 @@ const Dashboard = () => {
         data={editData ? editData : null}
         selectedTestType={selectedTestType || "Ecografie"}
         defaultTimeOnAdd={prefillSlotTime}
+        defaultDoctorId={!isEcoSection ? selectedDoctorId : null}
       />
 
       {appointmentToDelete && (

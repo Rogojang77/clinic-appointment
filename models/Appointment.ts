@@ -57,13 +57,24 @@ AppointmentSchema.index({
   isConfirmed: 1,
 });
 
-// Prevent double-booking the same slot for the same section.
-// Partial index keeps backward compatibility for older docs without sectionId.
+// Prevent double-booking per doctor when doctorId is set (multi-doctor sections).
+AppointmentSchema.index(
+  { location: 1, date: 1, time: 1, doctorId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { doctorId: { $exists: true, $type: "objectId" } },
+  }
+);
+
+// Backward compatibility: section-level uniqueness when doctorId is absent (Ecografie, legacy).
 AppointmentSchema.index(
   { location: 1, date: 1, time: 1, sectionId: 1 },
   {
     unique: true,
-    partialFilterExpression: { sectionId: { $exists: true, $type: "objectId" } },
+    partialFilterExpression: {
+      sectionId: { $exists: true, $type: "objectId" },
+      $or: [{ doctorId: { $exists: false } }, { doctorId: null }],
+    },
   }
 );
 

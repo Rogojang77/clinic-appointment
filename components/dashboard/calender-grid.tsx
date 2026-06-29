@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, type ReactNode } from "react";
 import dayjs from "dayjs";
 import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
 import { getCalendarDays } from "@/utils/getCalenderDays";
@@ -17,6 +17,7 @@ const CalendarGrid = ({
   dayName,
   setDayName,
   locations = [],
+  sidebar,
 }: {
   selectedDate: any;
   setSelectedDate: any;
@@ -25,6 +26,7 @@ const CalendarGrid = ({
   dayName: string;
   setDayName: any;
   locations?: any[];
+  sidebar?: ReactNode;
 }) => {
   const [currentDate, setCurrentDate] = useState<dayjs.Dayjs | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -92,8 +94,8 @@ const CalendarGrid = ({
 
   return (
     <div className="flex flex-col lg:flex-row p-4 lg:space-x-10 w-full justify-between lg:px-10 px-5">
-      <div className="flex flex-col space-y-4 lg:space-x-0 space-x-5 justify-start items-center">
-        <div className="border rounded-md px-4 py-2 w-32">
+      <div className="flex flex-col gap-4 shrink-0 lg:w-[30%] w-full justify-start items-stretch">
+        <div className="border rounded-md px-4 py-2 w-full">
           {locations.map((loc: any) => (
             <label key={loc._id} className="cursor-pointer flex">
               <input
@@ -108,6 +110,7 @@ const CalendarGrid = ({
             </label>
           ))}
         </div>
+        {sidebar}
       </div>
 
       {!currentDate ? (

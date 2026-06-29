@@ -86,14 +86,14 @@ const Notes = ({ selectedDate, location,textareaContent,setTextareaContent }: No
   };
 
   return (
-    <div className="flex lg:flex-row flex-col justify-center items-center space-x-5 relative">
+    <div className="flex flex-col gap-2 w-full relative">
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 z-10 rounded-md">
           <Spinner />
         </div>
       )}
       <textarea
-        className="w-full m-auto h-40 rounded-sm lg:px-10 px-5 mb-2 py-2 mt-5"
+        className="w-full h-16 text-sm rounded-sm border border-gray-200 px-2 py-1.5 resize-none"
         value={textareaContent}
         onChange={(e) => setTextareaContent(e.target.value)}
         disabled={isLoading}
@@ -102,7 +102,7 @@ const Notes = ({ selectedDate, location,textareaContent,setTextareaContent }: No
       <button
         className={`${
           noteId ? "bg-green-500" : "bg-blue-500"
-        } text-white px-4 py-2 rounded lg:w-40 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
+        } text-white text-xs px-2 py-1.5 rounded w-full flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed`}
         onClick={handleAddOrUpdateNotes}
         disabled={isLoading}
       >

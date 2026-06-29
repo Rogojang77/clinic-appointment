@@ -77,15 +77,16 @@ async function getLocationSchedule(
 }
 
 /**
- * Booked times for this section (or testType) + location + calendar date.
- * sectionId keeps sections from blocking each other's slots at the same hour.
+ * Booked times for this doctor, section (or testType) + location + calendar date.
+ * When doctorId is set, only that doctor's appointments block slots.
  */
 async function getBookedAppointments(
   sectionId: string | null | undefined,
   location: string,
   date: string,
   times: string[],
-  testType?: string | null | undefined
+  testType?: string | null | undefined,
+  doctorId?: string | null | undefined
 ): Promise<Set<string>> {
   await dbConnect();
 
@@ -103,10 +104,15 @@ async function getBookedAppointments(
     $lte: endOfDay,
   };
 
-  if (sectionId) {
+  if (doctorId) {
+    filter.doctorId = mongoose.Types.ObjectId.isValid(doctorId)
+      ? new mongoose.Types.ObjectId(doctorId)
+      : doctorId;
+  } else if (sectionId) {
     filter.sectionId = mongoose.Types.ObjectId.isValid(sectionId)
       ? new mongoose.Types.ObjectId(sectionId)
       : sectionId;
+    filter.$or = [{ doctorId: { $exists: false } }, { doctorId: null }];
   } else if (testType) {
     filter.testType = testType;
   }
@@ -117,14 +123,15 @@ async function getBookedAppointments(
 
 /**
  * Available time slots from the location schedule in MongoDB (SuperAdmin).
- * sectionId only affects which existing appointments block a time, not which hours are offered.
+ * sectionId/doctorId only affect which existing appointments block a time.
  */
 export async function getAvailableTimeSlots(
   sectionId: string | null | undefined,
   location: string,
   day: string,
   date?: string,
-  testType?: string | null | undefined
+  testType?: string | null | undefined,
+  doctorId?: string | null | undefined
 ): Promise<TimeSlot[]> {
   await dbConnect();
 
@@ -139,7 +146,8 @@ export async function getAvailableTimeSlots(
       location,
       date,
       timeSlots.map((slot) => slot.time),
-      testType || null
+      testType || null,
+      doctorId || null
     );
 
     timeSlots = timeSlots.map((slot) => ({
@@ -159,7 +167,15 @@ export async function getAvailableTimeSlots(
     if (!existingSlot) {
       timeSlotMap.set(slot.time, slot);
     } else if (slot.date !== "00:00:00" && existingSlot.date === "00:00:00") {
-      timeSlotMap.set(slot.time, slot);
+      timeSlotMap.set(slot.time, {
+        ...slot,
+        isAvailable: slot.isAvailable && existingSlot.isAvailable,
+      });
+    } else {
+      timeSlotMap.set(slot.time, {
+        ...existingSlot,
+        isAvailable: slot.isAvailable && existingSlot.isAvailable,
+      });
     }
   }
 

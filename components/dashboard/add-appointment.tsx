@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { Formik, Form, Field } from "formik";
 import * as Yup from "yup";
 import { Button } from "@/components/ui/button";
@@ -207,21 +207,7 @@ interface Appointment {
   doctor?: { _id: string; name: string; specialization?: string };
 }
 
-// Validation schema using Yup
-const AppointmentSchema = Yup.object().shape({
-  time: Yup.string().required("Ora este obligatorie"),
-  patientName: Yup.string().required("Numele este obligatoriu"),
-  testType: Yup.string().required("Tipul este obligatoriu"),
-  phoneNumber: Yup.string().required("Numărul de telefon este obligatoriu"),
-  doctorName: Yup.string().optional(),
-  sectionId: Yup.string().when('testType', {
-    is: (testType: string) => testType && testType !== 'Ecografie',
-    then: (schema) => schema.required("Secția este obligatorie"),
-    otherwise: (schema) => schema.optional(),
-  }),
-  doctorId: Yup.string().optional(),
-});
-
+// Validation built dynamically in component (doctor required only when section has doctors)
 interface AppointmentAddEditProps {
   isModalOpen: boolean;
   isEco?: boolean;
@@ -235,6 +221,8 @@ interface AppointmentAddEditProps {
   selectedTestType?: string | null;
   /** Când e deschis fără edit: precompletează ora (ex. click + pe rândul liber) */
   defaultTimeOnAdd?: string | null;
+  /** Medic pre-selectat din tab-ul activ al dashboard-ului */
+  defaultDoctorId?: string | null;
 }
 
 export default function AppointmentAddEdit({
@@ -249,6 +237,7 @@ export default function AppointmentAddEdit({
   appointments,
   selectedTestType,
   defaultTimeOnAdd = null,
+  defaultDoctorId = null,
 }: AppointmentAddEditProps) {
   const [customTime, setCustomTime] = useState("");
   const [selectTime, setSelectTime] = useState({
@@ -258,6 +247,7 @@ export default function AppointmentAddEdit({
   const [showTimeSelector, setShowTimeSelector] = useState(false);
   const [selectedDepartment, setSelectedDepartment] = useState("");
   const [selectedSection, setSelectedSection] = useState("");
+  const [selectedDoctorId, setSelectedDoctorId] = useState("");
   const [sections, setSections] = useState<Section[]>([]);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
@@ -270,7 +260,30 @@ export default function AppointmentAddEdit({
   const fetchingDoctorsRef = useRef<Set<string>>(new Set()); // Track in-flight doctor requests by sectionId
   const fetchingTimeSlotsRef = useRef<Set<string>>(new Set()); // Track in-flight time slot requests by key
   const hasPrefilledSectionRef = useRef<boolean>(false); // Track if we've already prefilled section from selectedTestType
+  const hasPrefilledDoctorRef = useRef<boolean>(false);
   
+  const validationSchema = useMemo(
+    () =>
+      Yup.object().shape({
+        time: Yup.string().required("Ora este obligatorie"),
+        patientName: Yup.string().required("Numele este obligatoriu"),
+        testType: Yup.string().required("Tipul este obligatoriu"),
+        phoneNumber: Yup.string().required("Numărul de telefon este obligatoriu"),
+        doctorName: Yup.string().optional(),
+        sectionId: Yup.string().when("testType", {
+          is: (testType: string) => testType && testType !== "Ecografie",
+          then: (schema) => schema.required("Secția este obligatorie"),
+          otherwise: (schema) => schema.optional(),
+        }),
+        doctorId: Yup.string().when("testType", {
+          is: (testType: string) =>
+            testType && testType !== "Ecografie" && doctors.length > 0,
+          then: (schema) => schema.required("Medicul este obligatoriu"),
+          otherwise: (schema) => schema.optional(),
+        }),
+      }),
+    [doctors.length]
+  );
   // Refs for form fields to enable scrolling to invalid inputs
   const fieldRefs = useRef<{ [key: string]: HTMLElement | null }>({});
 
@@ -279,7 +292,7 @@ export default function AppointmentAddEdit({
 
   // Function to scroll to the first invalid field
   const scrollToFirstInvalidField = (errors: any, touched: any) => {
-    const fieldOrder = ['patientName', 'phoneNumber', 'sectionId', 'testType', 'time'];
+    const fieldOrder = ['patientName', 'phoneNumber', 'sectionId', 'doctorId', 'testType', 'time'];
     
     for (const fieldName of fieldOrder) {
       if (errors[fieldName] && touched[fieldName]) {
@@ -354,6 +367,7 @@ export default function AppointmentAddEdit({
       }
 
       resetForm();
+      lastFetchedLocationRef.current = "";
       handleModal();
       fetchAppointments();
       toast.success(
@@ -495,11 +509,26 @@ export default function AppointmentAddEdit({
   }, []);
 
   // get the time slots based on section + location + day
-  const fetchTimeSlots = useCallback(async (sectionIdFromForm?: string, locationToUse?: string, testTypeToUse?: string) => {
+  const fetchTimeSlots = useCallback(async (
+    sectionIdFromForm?: string,
+    locationToUse?: string,
+    testTypeToUse?: string,
+    doctorIdFromForm?: string
+  ) => {
     const locationValue = locationToUse || location;
     if (locationValue && day) {
+      const doctorIdToUse = doctorIdFromForm || selectedDoctorId || undefined;
+
+      // Non-Ecografie with doctors: slots are per medic
+      if (!isEco && doctors.length > 0 && !doctorIdToUse) {
+        setTimeSlots([]);
+        setHasScheduleForDay(false);
+        setIsLoadingTimeSlots(false);
+        return;
+      }
+
       // Create a unique key for this request
-      const requestKey = `${locationValue}-${day}-${sectionIdFromForm || selectedSection || 'no-section'}-${date?.format("YYYY-MM-DD") || ''}`;
+      const requestKey = `${locationValue}-${day}-${sectionIdFromForm || selectedSection || 'no-section'}-${date?.format("YYYY-MM-DD") || ''}-${doctorIdToUse || 'no-doctor'}`;
       
       // Prevent duplicate simultaneous requests
       if (fetchingTimeSlotsRef.current.has(requestKey)) {
@@ -550,7 +579,8 @@ export default function AppointmentAddEdit({
           day,
           formattedDate,
           normalizedSectionId,
-          testTypeForFilter
+          testTypeForFilter,
+          doctorIdToUse
         );
         setTimeSlots(slots || []);
         // Check if schedule exists (if slots are empty, no schedule exists)
@@ -568,7 +598,7 @@ export default function AppointmentAddEdit({
       setHasScheduleForDay(false);
       setIsLoadingTimeSlots(false);
     }
-  }, [location, day, date, selectedSection, sections, data, setTimeSlots]);
+  }, [location, day, date, selectedSection, selectedDoctorId, sections, data, setTimeSlots, isEco, doctors.length]);
 
 
   // Removed duplicate fetchTimeSlots - handled by the effect that watches selectedSection
@@ -576,6 +606,17 @@ export default function AppointmentAddEdit({
   useEffect(() => {
     fetchLocations();
   }, [fetchLocations]);
+
+  // Force fresh slot availability when modal opens (e.g. after a booking)
+  useEffect(() => {
+    if (isModalOpen) {
+      lastFetchedLocationRef.current = "";
+    } else {
+      lastFetchedLocationRef.current = "";
+      setSelectedDoctorId("");
+      hasPrefilledDoctorRef.current = false;
+    }
+  }, [isModalOpen]);
 
   // Fetch sections when location changes or when locations are loaded
   useEffect(() => {
@@ -657,7 +698,37 @@ export default function AppointmentAddEdit({
     }
   }, [selectedSection, isModalOpen, fetchDoctors]);
 
-  // Fetch time slots when section, location, day, or date changes (only when modal is open)
+  // Pre-select first medic (sau tab-ul activ din dashboard) la deschiderea modalului
+  useEffect(() => {
+    if (!isModalOpen || isEco) return;
+
+    const setF = setFieldValueRef.current;
+    if (!setF) return;
+
+    if (data?.doctorId || data?.doctor?._id) {
+      const id = typeof data.doctorId === "string" ? data.doctorId : data.doctor?._id;
+      if (id) {
+        setSelectedDoctorId(id);
+        hasPrefilledDoctorRef.current = true;
+      }
+      return;
+    }
+
+    if (hasPrefilledDoctorRef.current || doctors.length === 0) return;
+
+    const preferredId =
+      defaultDoctorId && doctors.some((d) => d._id === defaultDoctorId)
+        ? defaultDoctorId
+        : doctors[0]._id;
+    const doc = doctors.find((d) => d._id === preferredId);
+
+    setSelectedDoctorId(preferredId);
+    setF("doctorId", preferredId);
+    if (doc) setF("doctorName", doc.name);
+    hasPrefilledDoctorRef.current = true;
+  }, [isModalOpen, isEco, doctors, defaultDoctorId, data]);
+
+  // Fetch time slots when section, location, day, date, or doctor changes (only when modal is open)
   // Note: Location changes are handled in the onChange handler to prevent duplicate requests
   useEffect(() => {
     // Skip if location change is in progress (handled by onChange handler) or modal is closed
@@ -666,14 +737,12 @@ export default function AppointmentAddEdit({
     }
     
     if (location && day) {
-      // Only fetch if location prop actually changed (not from user selection in form)
-      // This prevents duplicate requests when user selects location via radio button
-      const currentRequestKey = `${location}-${day}-${selectedSection || 'no-section'}-${date?.format("YYYY-MM-DD") || ''}`;
+      const currentRequestKey = `${location}-${day}-${selectedSection || 'no-section'}-${date?.format("YYYY-MM-DD") || ''}-${selectedDoctorId || 'no-doctor'}`;
       if (lastFetchedLocationRef.current !== currentRequestKey) {
-        fetchTimeSlots(selectedSection || undefined, location);
+        fetchTimeSlots(selectedSection || undefined, location, undefined, selectedDoctorId || undefined);
       }
     }
-  }, [selectedSection, location, day, date, isModalOpen, fetchTimeSlots]);
+  }, [selectedSection, selectedDoctorId, location, day, date, isModalOpen, fetchTimeSlots]);
 
   // Initialize customTime and showTimeSelector (edit) sau reset / prefill oră (add)
   useEffect(() => {
@@ -767,9 +836,9 @@ export default function AppointmentAddEdit({
                 sectionId: data?.sectionId || data?.section?._id || (selectedTestType && sections.length > 0 
                   ? sections.find((s: any) => s.name === selectedTestType)?._id || ""
                   : ""),
-                doctorId: data?.doctorId || data?.doctor?._id || "",
+                doctorId: data?.doctorId || data?.doctor?._id || defaultDoctorId || "",
               }}
-              validationSchema={AppointmentSchema}
+              validationSchema={validationSchema}
               onSubmit={handleAddOrUpdateAppointment}
               validateOnChange={true}
               validateOnBlur={true}
@@ -786,7 +855,7 @@ export default function AppointmentAddEdit({
                   e.preventDefault();
                   
                   // Mark all fields as touched to show errors
-                  const allFields = ['patientName', 'phoneNumber', 'sectionId', 'testType', 'time'];
+                  const allFields = ['patientName', 'phoneNumber', 'sectionId', 'doctorId', 'testType', 'time'];
                   const touchedFields: any = {};
                   allFields.forEach(field => {
                     touchedFields[field] = true;
@@ -892,12 +961,19 @@ export default function AppointmentAddEdit({
                           setSelectedSection(selectedSectionId);
                           setFieldValue("doctorId", ""); // Reset doctor when section changes
                           setFieldValue("doctorName", ""); // Reset doctor name
+                          setSelectedDoctorId("");
+                          hasPrefilledDoctorRef.current = false;
                           setFieldValue("time", ""); // Reset time when section changes
                           setSelectTime({ time: "", date: "" }); // Reset selected time
                           
-                          // Fetch time slots for the new section using current form location
-                          if (values.location && day) {
-                            await fetchTimeSlots(selectedSectionId, values.location, selectedSectionObj?.name);
+                          // Time slots reload after medic is selected (non-Ecografie)
+                          if (values.location && day && (isEco || selectedDoctorId)) {
+                            await fetchTimeSlots(
+                              selectedSectionId,
+                              values.location,
+                              selectedSectionObj?.name,
+                              selectedDoctorId || undefined
+                            );
                           }
                         }}
                         disabled={!location || sections.length === 0}
@@ -936,10 +1012,10 @@ export default function AppointmentAddEdit({
                       </div>
                     ) : (
                       <>
-                        {selectedSection && (
+                        {selectedSection && doctors.length > 0 && (
                           <div>
                             <Label htmlFor="doctorId" className="mb-1.5 block text-sm font-medium">
-                              Medic
+                              Medic <span className="text-red-500">*</span>
                             </Label>
                             <Field
                               as="select"
@@ -947,10 +1023,24 @@ export default function AppointmentAddEdit({
                               id="doctorId"
                               value={values.doctorId}
                               onChange={(e: any) => {
-                                const selectedDoctorId = e.target.value;
-                                const selectedDoctor = doctors.find((d: any) => d._id === selectedDoctorId);
-                                setFieldValue("doctorId", selectedDoctorId);
+                                const selectedDoctorIdValue = e.target.value;
+                                const selectedDoctor = doctors.find((d: any) => d._id === selectedDoctorIdValue);
+                                setFieldValue("doctorId", selectedDoctorIdValue);
                                 setFieldValue("doctorName", selectedDoctor?.name || "");
+                                setSelectedDoctorId(selectedDoctorIdValue);
+                                setFieldValue("time", "");
+                                setSelectTime({ time: "", date: "" });
+                                const sectionIdForSlots =
+                                  typeof values.sectionId === "string"
+                                    ? values.sectionId
+                                    : selectedSection || undefined;
+                                lastFetchedLocationRef.current = "";
+                                fetchTimeSlots(
+                                  sectionIdForSlots,
+                                  values.location,
+                                  values.testType,
+                                  selectedDoctorIdValue || undefined
+                                );
                               }}
                               className="block w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                             >
@@ -1015,9 +1105,8 @@ export default function AppointmentAddEdit({
                               // Fetch sections for the new location
                               await fetchSections(newLocation);
                               
-                              // Fetch time slots for the new location (if day is available)
-                              // Pass testType from form values as fallback when sectionId is not available
-                              if (day) {
+                              setTimeSlots([]);
+                              if (day && isEco) {
                                 await fetchTimeSlots(undefined, newLocation, values.testType);
                               }
                               
@@ -1123,6 +1212,15 @@ export default function AppointmentAddEdit({
                               </p>
                             </div>
                           </div>
+                        ) : !isEco && doctors.length > 0 && !values.doctorId && !selectedDoctorId ? (
+                          <div className="text-center py-8 px-4 bg-amber-50 rounded-lg border-2 border-dashed border-amber-200">
+                            <p className="text-sm font-medium text-amber-800 mb-1">
+                              Selectați medicul
+                            </p>
+                            <p className="text-xs text-amber-700">
+                              Sloturile se afișează după alegerea medicului; ocuparea este verificată per medic.
+                            </p>
+                          </div>
                         ) : timeSlots.length === 0 ? (
                           <div className="text-center py-8 px-4 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
                             <p className="text-sm font-medium text-gray-600 mb-2">
@@ -1144,8 +1242,7 @@ export default function AppointmentAddEdit({
                             </p>
                             <div className="grid lg:grid-cols-8 md:grid-cols-6 grid-cols-4 gap-1.5">
                               {timeSlots.map((slot: any, index: number) => {
-                                // Use backend's isAvailable flag - backend already filters by section+location+date
-                                const isAvailable = slot.isAvailable !== false; // Default to true if not specified
+                                const isAvailable = slot.isAvailable === true;
 
                                 return (
                                   <button
@@ -1155,7 +1252,7 @@ export default function AppointmentAddEdit({
                                       selectTime?.time === slot.time
                                         ? "bg-blue-600 text-white shadow-lg ring-2 ring-blue-500 ring-offset-2 scale-105"
                                         : !isAvailable
-                                        ? "bg-red-150 text-gray-400 cursor-not-allowed opacity-50 line-through"
+                                        ? "bg-red-100 text-gray-500 cursor-not-allowed opacity-60 line-through border border-red-200"
                                         : "bg-white text-gray-700 border-2 border-gray-300 hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700 hover:shadow-md hover:scale-105 active:scale-95"
                                     }`}
                                     onClick={() => {
@@ -1166,8 +1263,8 @@ export default function AppointmentAddEdit({
                                         setCustomTime("");
                                       }
                                     }}
-                                    disabled={!isAvailable} // Disable if not available (booked for this section)
-                                    title={!isAvailable ? "Slot ocupat" : `Selectează ${slot.time}`}
+                                    disabled={!isAvailable}
+                                    title={!isAvailable ? "Slot ocupat pentru acest medic" : `Selectează ${slot.time}`}
                                   >
                                     {slot?.time}
                                   </button>
