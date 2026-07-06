@@ -1,18 +1,21 @@
 "use client";
 
-import { useState } from "react";
-import { Edit, Trash, Loader, MessageCircle, Plus } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Trash, Loader, MessageCircle, Check } from "lucide-react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from "@/components/ui/dialog"; // Adjust the import path based on your structure
-import { Button } from "@/components/ui/button"; // Adjust the import path
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import toast from "react-hot-toast";
+import { Dayjs } from "dayjs";
 import api from "@/services/api";
+import type { Doctor } from "@/services/api";
 import isDateValid from "@/utils/isValidDate";
 import { buildTableRowsWithFreeSlots } from "@/utils/dashboardSlotRows";
 
@@ -46,91 +49,271 @@ interface Appointment {
   };
 }
 
+type InlineRowMode =
+  | {
+      kind: "create";
+      slotTime: string;
+      patientName: string;
+      phoneNumber: string;
+      notes: string;
+      doctorId: string;
+      focusField?: "patientName" | "phoneNumber";
+    }
+  | {
+      kind: "edit";
+      appointmentId: string;
+      patientName: string;
+      phoneNumber: string;
+      notes: string;
+    };
+
 interface TableComponentProps {
   appointments: Appointment[];
-  onEdit: (appointment: Appointment) => void;
   fetchData: () => void;
   selectedTestType?: string | null;
-  /** Ore din program (DB) pentru care se pot afișa rânduri „Liber” */
   allowedSlotTimes?: string[];
-  /** Deschide formularul de adăugare cu ora slotului (rândurile libere) */
-  onAddAtFreeSlot?: (slotTime: string) => void;
-  /** false pentru date în trecut sau fără permisiune */
-  canAddAtFreeSlot?: boolean;
+  canInlineCreate?: boolean;
+  location: string;
+  selectedDate: Dayjs | null;
+  day: string;
+  sectionId?: string;
+  isEcoSection?: boolean;
+  sectionDoctors?: Doctor[];
+  selectedSectionName?: string;
+  pendingEditAppointmentId?: string | null;
+  onPendingEditHandled?: () => void;
 }
 
 const TableComponent: React.FC<TableComponentProps> = ({
   appointments,
-  onEdit,
   fetchData,
   selectedTestType,
   allowedSlotTimes = [],
-  onAddAtFreeSlot,
-  canAddAtFreeSlot = false,
+  canInlineCreate = false,
+  location,
+  selectedDate,
+  day,
+  sectionId,
+  isEcoSection = false,
+  sectionDoctors = [],
+  selectedSectionName = "",
+  pendingEditAppointmentId,
+  onPendingEditHandled,
 }) => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [appointmentToDelete, setAppointmentToDelete] =
     useState<Appointment | null>(null);
   const [sendingById, setSendingById] = useState<Record<string, boolean>>({});
   const [sentById, setSentById] = useState<Record<string, boolean>>({});
-  const [sortField, setSortField] = useState<string>('');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [sortField, setSortField] = useState<string>("");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [inlineRow, setInlineRow] = useState<InlineRowMode | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const cancelInlineEdit = useCallback(() => {
+    setInlineRow(null);
+  }, []);
+
+  const startCreate = useCallback(
+    (slotTime: string, focusField: "patientName" | "phoneNumber" = "patientName") => {
+      setInlineRow({
+        kind: "create",
+        slotTime,
+        patientName: "",
+        phoneNumber: "",
+        notes: "",
+        doctorId: sectionDoctors[0]?._id || "",
+        focusField,
+      });
+    },
+    [sectionDoctors]
+  );
+
+  const startEdit = useCallback((appointment: Appointment) => {
+    setInlineRow({
+      kind: "edit",
+      appointmentId: appointment._id,
+      patientName: appointment.patientName,
+      phoneNumber: appointment.phoneNumber,
+      notes: appointment.notes || "",
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!pendingEditAppointmentId) return;
+    const apt = appointments.find((a) => a._id === pendingEditAppointmentId);
+    if (apt) {
+      startEdit(apt);
+      onPendingEditHandled?.();
+    }
+  }, [
+    pendingEditAppointmentId,
+    appointments,
+    startEdit,
+    onPendingEditHandled,
+  ]);
+
+  const updateInlineField = (
+    field: "patientName" | "phoneNumber" | "notes" | "doctorId",
+    value: string
+  ) => {
+    setInlineRow((prev) => (prev ? { ...prev, [field]: value } : null));
+  };
+
+  const handleSaveInline = async () => {
+    if (!inlineRow) return;
+
+    const patientName = inlineRow.patientName.trim();
+    const phoneNumber = inlineRow.phoneNumber.trim();
+    const notes = inlineRow.notes.trim();
+
+    if (!patientName || !phoneNumber) {
+      toast.error("Numele și telefonul sunt obligatorii.");
+      return;
+    }
+
+    if (
+      inlineRow.kind === "create" &&
+      !isEcoSection &&
+      sectionDoctors.length > 0 &&
+      !inlineRow.doctorId
+    ) {
+      toast.error("Selectați medicul.");
+      return;
+    }
+
+    const selectedDoctor = sectionDoctors.find(
+      (d) => d._id === (inlineRow.kind === "create" ? inlineRow.doctorId : "")
+    );
+
+    setIsSaving(true);
+    try {
+      if (inlineRow.kind === "create") {
+        if (!selectedDate || !day || !location) {
+          toast.error("Selectați data și locația.");
+          return;
+        }
+        const formattedDate = selectedDate.format("YYYY-MM-DD");
+        await api.post("/appointments", {
+          location,
+          date: formattedDate,
+          day,
+          time: inlineRow.slotTime,
+          patientName,
+          phoneNumber,
+          notes,
+          testType: selectedTestType || "Ecografie",
+          sectionId: sectionId || undefined,
+          doctorId:
+            !isEcoSection && inlineRow.kind === "create" && inlineRow.doctorId
+              ? inlineRow.doctorId
+              : undefined,
+          doctorName: isEcoSection
+            ? "-"
+            : selectedDoctor?.name || "",
+          isConfirmed: true,
+          isDefault: true,
+        });
+        toast.success("Programarea a fost creată cu succes!");
+      } else {
+        await api.patch(`/appointments?id=${inlineRow.appointmentId}`, {
+          patientName,
+          phoneNumber,
+          notes,
+        });
+        toast.success("Programarea a fost actualizată cu succes!");
+      }
+      setInlineRow(null);
+      fetchData();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(
+        err?.response?.data?.message || "A apărut o eroare la procesarea programării"
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleRowKeyDown = (
+    e: React.KeyboardEvent,
+    isEditing: boolean
+  ) => {
+    if (!isEditing) return;
+    if (e.key === "Escape") {
+      e.preventDefault();
+      cancelInlineEdit();
+      return;
+    }
+    if (e.key === "Enter") {
+      const target = e.target as HTMLElement;
+      if (target.tagName === "TEXTAREA") {
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          handleSaveInline();
+        }
+        return;
+      }
+      e.preventDefault();
+      handleSaveInline();
+    }
+  };
 
   const handleSort = (field: string) => {
     if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
     } else {
       setSortField(field);
-      setSortDirection('asc');
+      setSortDirection("asc");
     }
   };
 
   const sortData = (data: Appointment[]) => {
     if (!sortField) return data;
-    
+
     return [...data].sort((a, b) => {
-      let aValue: any;
-      let bValue: any;
-      
+      let aValue: string;
+      let bValue: string;
+
       switch (sortField) {
-        case 'time':
+        case "time":
           aValue = a.time;
           bValue = b.time;
           break;
-        case 'patientName':
+        case "patientName":
           aValue = a.patientName;
           bValue = b.patientName;
           break;
-        case 'section':
-          aValue = a.section?.name || a.testType || '';
-          bValue = b.section?.name || b.testType || '';
+        case "section":
+          aValue = a.section?.name || a.testType || "";
+          bValue = b.section?.name || b.testType || "";
           break;
-        case 'phoneNumber':
+        case "phoneNumber":
           aValue = a.phoneNumber;
           bValue = b.phoneNumber;
           break;
-        case 'doctor':
-          aValue = a.doctor?.name || a.doctorName || '';
-          bValue = b.doctor?.name || b.doctorName || '';
+        case "doctor":
+          aValue = a.doctor?.name || a.doctorName || "";
+          bValue = b.doctor?.name || b.doctorName || "";
           break;
-        case 'notes':
-          aValue = a.notes || '';
-          bValue = b.notes || '';
+        case "notes":
+          aValue = a.notes || "";
+          bValue = b.notes || "";
           break;
         default:
           return 0;
       }
-      
-      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+
+      if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+      if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
       return 0;
     });
   };
 
   const confirmDelete = (appointment: Appointment) => {
     setAppointmentToDelete(appointment);
-    setIsModalOpen(true);
+    setIsDeleteDialogOpen(true);
   };
 
   const handleConfirm = async () => {
@@ -145,13 +328,16 @@ const TableComponent: React.FC<TableComponentProps> = ({
         toast.error("Ceva nu a mers bine!");
       } finally {
         setIsDeleting(false);
-        setIsModalOpen(false);
+        setIsDeleteDialogOpen(false);
         setAppointmentToDelete(null);
       }
     }
   };
 
-  const handleToggleConfirmed = async (appointment: Appointment, checked: boolean) => {
+  const handleToggleConfirmed = async (
+    appointment: Appointment,
+    checked: boolean
+  ) => {
     try {
       await api.patch(`/appointments?id=${appointment._id}`, {
         isConfirmed: checked,
@@ -183,9 +369,153 @@ const TableComponent: React.FC<TableComponentProps> = ({
     }
   };
 
+  const inlineInputClassName = "h-8 text-sm bg-white";
+  const inlineSelectClassName =
+    "block w-full h-8 rounded-md border border-input bg-white px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+
+  const renderDoctorSelect = (doctorId: string) => (
+    <select
+      value={doctorId}
+      onChange={(e) => updateInlineField("doctorId", e.target.value)}
+      className={inlineSelectClassName}
+      aria-label="Medic"
+    >
+      <option value="">Selectează medic</option>
+      {sectionDoctors.map((doctor) => (
+        <option key={doctor._id} value={doctor._id}>
+          {doctor.name}
+          {doctor.specialization ? ` (${doctor.specialization})` : ""}
+        </option>
+      ))}
+    </select>
+  );
+
+  const renderAddLink = (
+    label: string,
+    slotTime: string,
+    focusField: "patientName" | "phoneNumber"
+  ) =>
+    canInlineCreate ? (
+      <button
+        type="button"
+        onClick={() => startCreate(slotTime, focusField)}
+        className="text-red-900/90 italic hover:underline cursor-pointer"
+      >
+        {label}
+      </button>
+    ) : (
+      <span className="text-red-900/90 italic">{label}</span>
+    );
+
+  const renderInlineSaveButton = () => (
+    <button
+      type="button"
+      onClick={handleSaveInline}
+      disabled={isSaving}
+      className="inline-flex h-8 w-8 items-center justify-center rounded-md text-green-800 bg-white/80 hover:bg-green-100 border border-green-400/60 shadow-sm disabled:opacity-50"
+      title="Salvează (Enter)"
+      aria-label="Salvează"
+    >
+      {isSaving ? (
+        <Loader className="h-4 w-4 animate-spin" />
+      ) : (
+        <Check className="h-4 w-4" />
+      )}
+    </button>
+  );
+
+  const renderInlineInputs = (
+    row: InlineRowMode,
+    isEcografie: boolean
+  ) => {
+    const focusField =
+      row.kind === "create" ? row.focusField ?? "patientName" : "patientName";
+    const createDoctorId = row.kind === "create" ? row.doctorId : "";
+
+    const notesCell = (
+      <Input
+        value={row.notes}
+        onChange={(e) => updateInlineField("notes", e.target.value)}
+        className={inlineInputClassName}
+        placeholder="Observații"
+        aria-label="Observații"
+      />
+    );
+
+    if (isEcografie) {
+      return (
+        <>
+          <td className="px-6 py-3 text-sm">
+            <Input
+              value={row.patientName}
+              onChange={(e) =>
+                updateInlineField("patientName", e.target.value)
+              }
+              className={inlineInputClassName}
+              placeholder="Nume"
+              aria-label="Nume pacient"
+              autoFocus={focusField === "patientName"}
+            />
+          </td>
+          <td className="px-6 py-3 text-sm">{notesCell}</td>
+          <td className="px-6 py-3 text-sm">
+            <Input
+              value={row.phoneNumber}
+              onChange={(e) =>
+                updateInlineField("phoneNumber", e.target.value)
+              }
+              className={inlineInputClassName}
+              placeholder="Telefon"
+              aria-label="Telefon"
+              autoFocus={focusField === "phoneNumber"}
+            />
+          </td>
+          <td className="px-6 py-3 text-sm text-gray-700">
+            {selectedSectionName || selectedTestType || "—"}
+          </td>
+        </>
+      );
+    }
+
+    return (
+      <>
+        <td className="px-6 py-3 text-sm">
+          <Input
+            value={row.patientName}
+            onChange={(e) => updateInlineField("patientName", e.target.value)}
+            className={inlineInputClassName}
+            placeholder="Nume"
+            aria-label="Nume pacient"
+            autoFocus={focusField === "patientName"}
+          />
+        </td>
+        <td className="px-6 py-3 text-sm text-gray-700">
+          {selectedSectionName || selectedTestType || "—"}
+        </td>
+        <td className="px-6 py-3 text-sm">
+          <Input
+            value={row.phoneNumber}
+            onChange={(e) => updateInlineField("phoneNumber", e.target.value)}
+            className={inlineInputClassName}
+            placeholder="Telefon"
+            aria-label="Telefon"
+            autoFocus={focusField === "phoneNumber"}
+          />
+        </td>
+        <td className="px-6 py-3 text-sm">
+          {sectionDoctors.length > 0 && row.kind === "create" ? (
+            renderDoctorSelect(createDoctorId)
+          ) : (
+            <span className="text-gray-700">—</span>
+          )}
+        </td>
+        <td className="px-6 py-3 text-sm">{notesCell}</td>
+      </>
+    );
+  };
+
   const renderTable = (appointmentsToRender: Appointment[], title?: string) => {
     const isEcografie = selectedTestType === "Ecografie";
-    /** Fără sortare pe coloane: programări + sloturi goale doar la orele din program (DB); la sortare rămân doar programările. */
     const useFreeSlotGrid = !sortField || sortField === "time";
     const displayRows = useFreeSlotGrid
       ? buildTableRowsWithFreeSlots(appointmentsToRender, {
@@ -200,16 +530,16 @@ const TableComponent: React.FC<TableComponentProps> = ({
       return (
         <div className="bg-white shadow rounded-lg">
           <div className="px-4 py-5 sm:p-6 text-center">
-            <p className="text-gray-500 font-medium text-lg">Nicio programare pentru această dată/locație.</p>
+            <p className="text-gray-500 font-medium text-lg">
+              Nicio programare pentru această dată/locație.
+            </p>
           </div>
         </div>
       );
     }
-    
+
     const getStatusBadge = (appointment: Appointment) => {
       const decision = appointment.patientDecision;
-      // Status refers ONLY to WhatsApp flow (sent + link decision),
-      // not to manual staff confirmation (`isConfirmed`).
       if (decision === "confirmed") {
         return (
           <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
@@ -245,16 +575,22 @@ const TableComponent: React.FC<TableComponentProps> = ({
       );
     };
 
-    const SortableHeader = ({ field, label }: { field: string; label: string }) => (
+    const SortableHeader = ({
+      field,
+      label,
+    }: {
+      field: string;
+      label: string;
+    }) => (
       <th
-        className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100`}
+        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
         onClick={() => handleSort(field)}
       >
         <div className="flex items-center space-x-1">
           <span>{label}</span>
           {sortField === field && (
             <span className="text-gray-400">
-              {sortDirection === 'asc' ? '↑' : '↓'}
+              {sortDirection === "asc" ? "↑" : "↓"}
             </span>
           )}
         </div>
@@ -287,7 +623,9 @@ const TableComponent: React.FC<TableComponentProps> = ({
                     <SortableHeader field="section" label="Secție" />
                   )}
                   <SortableHeader field="phoneNumber" label="Telefon" />
-                  <SortableHeader field="doctor" label="Doctor" />
+                  {!isEcografie && (
+                    <SortableHeader field="doctor" label="Doctor" />
+                  )}
                   {isEcografie ? (
                     <SortableHeader field="section" label="Secție" />
                   ) : (
@@ -298,149 +636,297 @@ const TableComponent: React.FC<TableComponentProps> = ({
               <tbody className="bg-white divide-y divide-gray-200">
                 {displayRows.map((row, index) => {
                   if (row.type === "free") {
-                    const canQuickAdd = Boolean(
-                      onAddAtFreeSlot && canAddAtFreeSlot
-                    );
+                    const isCreating =
+                      inlineRow?.kind === "create" &&
+                      inlineRow.slotTime === row.slotTime;
+
                     return (
                       <tr
                         key={`free-${row.slotTime}`}
-                        className="bg-red-200/95 hover:bg-red-200/90 transition-colors"
+                        className={`${
+                          isCreating
+                            ? "bg-red-100 ring-2 ring-inset ring-red-400"
+                            : "bg-red-200/95 hover:bg-red-200/90"
+                        } transition-colors`}
+                        onKeyDown={(e) =>
+                          handleRowKeyDown(e, isCreating)
+                        }
                         title={
-                          canQuickAdd
-                            ? "Adaugă programare la acest orar"
-                            : "Interval liber 15 min — adaugă o programare cu «Adaugă rând»"
+                          canInlineCreate
+                            ? "Click pe Adauga nume sau Adauga telefon pentru a adăuga programare"
+                            : "Interval liber"
                         }
                       >
                         <td className="px-6 py-3 text-sm text-red-800/80">—</td>
                         <td className="px-6 py-3 text-sm text-red-800/60">
-                          {canQuickAdd ? (
-                            <button
-                              type="button"
-                              onClick={() => onAddAtFreeSlot!(row.slotTime)}
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-red-900 bg-white/50 hover:bg-red-100 border border-red-300/60 shadow-sm"
-                              title="Adaugă programare"
-                              aria-label={`Adaugă programare la ${row.slotTime}`}
-                            >
-                              <Plus className="h-4 w-4" />
-                            </button>
-                          ) : (
-                            "—"
-                          )}
+                          {isCreating ? renderInlineSaveButton() : "—"}
                         </td>
                         <td className="px-6 py-3 whitespace-nowrap text-sm font-mono text-red-900">
                           {row.slotTime}
                         </td>
-                        <td className="px-6 py-3 text-sm text-red-900/90 italic">Liber</td>
-                        <td className="px-6 py-3 text-sm text-red-800/70">—</td>
-                        <td className="px-6 py-3 text-sm text-red-800/70">—</td>
-                        <td className="px-6 py-3 text-sm text-red-800/70">—</td>
-                        <td className="px-6 py-3 text-sm text-red-800/70">—</td>
+                        {isCreating && inlineRow ? (
+                          renderInlineInputs(inlineRow, isEcografie)
+                        ) : (
+                          <>
+                            <td className="px-6 py-3 text-sm">
+                              {renderAddLink("Adauga nume", row.slotTime, "patientName")}
+                            </td>
+                            <td className="px-6 py-3 text-sm text-red-800/70">
+                              —
+                            </td>
+                            <td className="px-6 py-3 text-sm">
+                              {renderAddLink("Adauga telefon", row.slotTime, "phoneNumber")}
+                            </td>
+                            {!isEcografie && (
+                              <td className="px-6 py-3 text-sm text-red-800/70">
+                                —
+                              </td>
+                            )}
+                            <td className="px-6 py-3 text-sm text-red-800/70">
+                              —
+                            </td>
+                          </>
+                        )}
                       </tr>
                     );
                   }
 
                   const appointment = row.appointment;
+                  const isEditing =
+                    inlineRow?.kind === "edit" &&
+                    inlineRow.appointmentId === appointment._id;
+                  const canEditDate = isDateValid(appointment.date);
                   const isWhatsAppSent =
                     appointment.whatsAppReminderStatus === "sent" ||
                     !!sentById[appointment._id];
+
                   return (
-                  <tr
-                    key={`${appointment._id}-${index}`}
-                    className={`${
-                      appointment.isConfirmed === true
-                        ? "bg-red-100 hover:bg-red-200"
-                        : "bg-green-200 hover:bg-green-200"
-                    } transition-colors`}
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {getStatusBadge(appointment)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => onEdit(appointment)}
-                          className={`${
-                            isDateValid(appointment.date)
-                              ? "text-indigo-600 hover:text-indigo-900"
-                              : "text-gray-400 cursor-not-allowed"
-                          }`}
-                          disabled={!isDateValid(appointment.date)}
-                          title="Editează"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleSendWhatsApp(appointment)}
-                          className={`${
-                            isDateValid(appointment.date) && !isWhatsAppSent
-                              ? "text-green-700 hover:text-green-900"
-                              : "text-gray-400 cursor-not-allowed"
-                          }`}
-                          disabled={
-                            !isDateValid(appointment.date) ||
-                            isWhatsAppSent ||
-                            !!sendingById[appointment._id]
-                          }
-                          title="Trimite WhatsApp"
-                        >
-                          {sendingById[appointment._id] ? (
-                            <Loader className="h-4 w-4 animate-spin" />
+                    <tr
+                      key={`${appointment._id}-${index}`}
+                      className={`${
+                        isEditing
+                          ? "ring-2 ring-inset ring-indigo-400"
+                          : appointment.isConfirmed === true
+                            ? "bg-red-100 hover:bg-red-200"
+                            : "bg-green-200 hover:bg-green-200"
+                      } transition-colors`}
+                      onKeyDown={(e) => handleRowKeyDown(e, isEditing)}
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {getStatusBadge(appointment)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex items-center space-x-2">
+                          {isEditing && renderInlineSaveButton()}
+                          <button
+                            onClick={() => handleSendWhatsApp(appointment)}
+                            className={`${
+                              canEditDate && !isWhatsAppSent
+                                ? "text-green-700 hover:text-green-900"
+                                : "text-gray-400 cursor-not-allowed"
+                            }`}
+                            disabled={
+                              !canEditDate ||
+                              isWhatsAppSent ||
+                              !!sendingById[appointment._id]
+                            }
+                            title="Trimite WhatsApp"
+                          >
+                            {sendingById[appointment._id] ? (
+                              <Loader className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <MessageCircle className="h-4 w-4" />
+                            )}
+                          </button>
+                          <button
+                            onClick={() => confirmDelete(appointment)}
+                            className={`${
+                              canEditDate
+                                ? "text-red-600 hover:text-red-900"
+                                : "text-gray-400 cursor-not-allowed"
+                            }`}
+                            disabled={!canEditDate}
+                            title="Șterge"
+                          >
+                            <Trash className="h-4 w-4" />
+                          </button>
+                          <Switch
+                            checked={appointment.isConfirmed}
+                            onCheckedChange={(checked) =>
+                              handleToggleConfirmed(appointment, checked)
+                            }
+                            title={
+                              appointment.isConfirmed
+                                ? "Confirmat"
+                                : "Neconfirmat"
+                            }
+                          />
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {appointment.time}
+                      </td>
+                      {isEditing && inlineRow ? (
+                        <>
+                          {isEcografie ? (
+                            <>
+                              <td className="px-6 py-4 text-sm">
+                                <Input
+                                  value={inlineRow.patientName}
+                                  onChange={(e) =>
+                                    updateInlineField(
+                                      "patientName",
+                                      e.target.value
+                                    )
+                                  }
+                                  className={inlineInputClassName}
+                                  placeholder="Nume"
+                                  aria-label="Nume pacient"
+                                  autoFocus
+                                />
+                              </td>
+                              <td className="px-6 py-4 text-sm">
+                                <Input
+                                  value={inlineRow.notes}
+                                  onChange={(e) =>
+                                    updateInlineField("notes", e.target.value)
+                                  }
+                                  className={inlineInputClassName}
+                                  placeholder="Observații"
+                                  aria-label="Observații"
+                                />
+                              </td>
+                              <td className="px-6 py-4 text-sm">
+                                <Input
+                                  value={inlineRow.phoneNumber}
+                                  onChange={(e) =>
+                                    updateInlineField(
+                                      "phoneNumber",
+                                      e.target.value
+                                    )
+                                  }
+                                  className={inlineInputClassName}
+                                  placeholder="Telefon"
+                                  aria-label="Telefon"
+                                />
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {appointment.section?.name ||
+                                  appointment.testType ||
+                                  "-"}
+                              </td>
+                            </>
                           ) : (
-                            <MessageCircle className="h-4 w-4" />
+                            <>
+                              <td className="px-6 py-4 text-sm">
+                                <Input
+                                  value={inlineRow.patientName}
+                                  onChange={(e) =>
+                                    updateInlineField(
+                                      "patientName",
+                                      e.target.value
+                                    )
+                                  }
+                                  className={inlineInputClassName}
+                                  placeholder="Nume"
+                                  aria-label="Nume pacient"
+                                  autoFocus
+                                />
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {appointment.section?.name ||
+                                  appointment.testType ||
+                                  "-"}
+                              </td>
+                              <td className="px-6 py-4 text-sm">
+                                <Input
+                                  value={inlineRow.phoneNumber}
+                                  onChange={(e) =>
+                                    updateInlineField(
+                                      "phoneNumber",
+                                      e.target.value
+                                    )
+                                  }
+                                  className={inlineInputClassName}
+                                  placeholder="Telefon"
+                                  aria-label="Telefon"
+                                />
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {appointment.doctor?.name ||
+                                  appointment.doctorName ||
+                                  "-"}
+                              </td>
+                              <td className="px-6 py-4 text-sm">
+                                <Input
+                                  value={inlineRow.notes}
+                                  onChange={(e) =>
+                                    updateInlineField("notes", e.target.value)
+                                  }
+                                  className={inlineInputClassName}
+                                  placeholder="Observații"
+                                  aria-label="Observații"
+                                />
+                              </td>
+                            </>
                           )}
-                        </button>
-                        <button
-                          onClick={() => confirmDelete(appointment)}
-                          className={`${
-                            isDateValid(appointment.date)
-                              ? "text-red-600 hover:text-red-900"
-                              : "text-gray-400 cursor-not-allowed"
-                          }`}
-                          disabled={!isDateValid(appointment.date)}
-                          title="Șterge"
-                        >
-                          <Trash className="h-4 w-4" />
-                        </button>
-                        <Switch
-                          checked={appointment.isConfirmed}
-                          onCheckedChange={(checked) =>
-                            handleToggleConfirmed(appointment, checked)
-                          }
-                          title={appointment.isConfirmed ? "Confirmat" : "Neconfirmat"}
-                        />
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {appointment.time}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {appointment.patientName}
-                    </td>
-                    {isEcografie ? (
-                      <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate" title={appointment.notes || "-"}>
-                        {appointment.notes || "-"}
-                      </td>
-                    ) : (
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {appointment.section?.name || appointment.testType || "-"}
-                      </td>
-                    )}
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {appointment.phoneNumber}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {appointment.doctor?.name || appointment.doctorName || "-"}
-                    </td>
-                    {isEcografie ? (
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {appointment.section?.name || appointment.testType || "-"}
-                      </td>
-                    ) : (
-                      <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate" title={appointment.notes || "-"}>
-                        {appointment.notes || "-"}
-                      </td>
-                    )}
-                  </tr>
+                        </>
+                      ) : (
+                        <>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {canEditDate ? (
+                              <button
+                                type="button"
+                                onClick={() => startEdit(appointment)}
+                                className="text-left hover:underline cursor-pointer"
+                              >
+                                {appointment.patientName}
+                              </button>
+                            ) : (
+                              appointment.patientName
+                            )}
+                          </td>
+                          {isEcografie ? (
+                            <td
+                              className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate"
+                              title={appointment.notes || "-"}
+                            >
+                              {appointment.notes || "-"}
+                            </td>
+                          ) : (
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {appointment.section?.name ||
+                                appointment.testType ||
+                                "-"}
+                            </td>
+                          )}
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {appointment.phoneNumber}
+                          </td>
+                          {!isEcografie && (
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {appointment.doctor?.name ||
+                                appointment.doctorName ||
+                                "-"}
+                            </td>
+                          )}
+                          {isEcografie ? (
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {appointment.section?.name ||
+                                appointment.testType ||
+                                "-"}
+                            </td>
+                          ) : (
+                            <td
+                              className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate"
+                              title={appointment.notes || "-"}
+                            >
+                              {appointment.notes || "-"}
+                            </td>
+                          )}
+                        </>
+                      )}
+                    </tr>
                   );
                 })}
               </tbody>
@@ -455,8 +941,7 @@ const TableComponent: React.FC<TableComponentProps> = ({
     <div className="lg:px-10 px-5 mb-5">
       {renderTable(appointments || [])}
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent className="sm:max-w-[425px] min-w-[400px]">
           <DialogHeader>
             <DialogTitle>Confirmă Ștergerea</DialogTitle>
@@ -465,10 +950,18 @@ const TableComponent: React.FC<TableComponentProps> = ({
             Ești sigur că vrei să ștergi această programare?
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsModalOpen(false)} disabled={isDeleting}>
+            <Button
+              variant="outline"
+              onClick={() => setIsDeleteDialogOpen(false)}
+              disabled={isDeleting}
+            >
               Anulează
             </Button>
-            <Button variant="destructive" onClick={handleConfirm} disabled={isDeleting}>
+            <Button
+              variant="destructive"
+              onClick={handleConfirm}
+              disabled={isDeleting}
+            >
               {isDeleting ? (
                 <>
                   <Loader className="mr-2 h-4 w-4 animate-spin" />

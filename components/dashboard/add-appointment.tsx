@@ -994,71 +994,61 @@ export default function AppointmentAddEdit({
                       )}
                     </div>
 
-                    {values.testType === "Ecografie" ? (
+                    {doctors.length > 0 && (
                       <div>
-                        <Label htmlFor="doctorName" className="mb-1.5 block text-sm font-medium">
-                          Medic
+                        <Label htmlFor="doctorId" className="mb-1.5 block text-sm font-medium">
+                          Medic{" "}
+                          {values.testType !== "Ecografie" && (
+                            <span className="text-red-500">*</span>
+                          )}
                         </Label>
-                        <Field 
-                          name="doctorName" 
-                          as={Input} 
-                          id="doctorName"
-                          placeholder="Nume medic"
-                          className="w-full"
-                        />
-                        {errors.doctorName && touched.doctorName && (
-                          <div className="text-red-500 text-sm mt-1">{errors.doctorName}</div>
-                        )}
-                      </div>
-                    ) : (
-                      <>
-                        {selectedSection && doctors.length > 0 && (
-                          <div>
-                            <Label htmlFor="doctorId" className="mb-1.5 block text-sm font-medium">
-                              Medic <span className="text-red-500">*</span>
-                            </Label>
-                            <Field
-                              as="select"
-                              name="doctorId"
-                              id="doctorId"
-                              value={values.doctorId}
-                              onChange={(e: any) => {
-                                const selectedDoctorIdValue = e.target.value;
-                                const selectedDoctor = doctors.find((d: any) => d._id === selectedDoctorIdValue);
-                                setFieldValue("doctorId", selectedDoctorIdValue);
-                                setFieldValue("doctorName", selectedDoctor?.name || "");
-                                setSelectedDoctorId(selectedDoctorIdValue);
-                                setFieldValue("time", "");
-                                setSelectTime({ time: "", date: "" });
-                                const sectionIdForSlots =
-                                  typeof values.sectionId === "string"
-                                    ? values.sectionId
-                                    : selectedSection || undefined;
-                                lastFetchedLocationRef.current = "";
-                                fetchTimeSlots(
-                                  sectionIdForSlots,
-                                  values.location,
-                                  values.testType,
-                                  selectedDoctorIdValue || undefined
-                                );
-                              }}
-                              className="block w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                            >
-                              <option value="">Selectează un medic</option>
-                              {doctors.map((doctor: any) => (
-                                <option key={doctor._id} value={doctor._id}>
-                                  {doctor.name} {doctor.specialization && `(${doctor.specialization})`}
-                                </option>
-                              ))}
-                            </Field>
-                            {errors.doctorId && touched.doctorId && (
-                              <div className="text-red-500 text-sm mt-1">
-                                {errors.doctorId}
-                              </div>
-                            )}
+                        <Field
+                          as="select"
+                          name="doctorId"
+                          id="doctorId"
+                          value={values.doctorId}
+                          onChange={(e: any) => {
+                            const selectedDoctorIdValue = e.target.value;
+                            const selectedDoctor = doctors.find(
+                              (d: any) => d._id === selectedDoctorIdValue
+                            );
+                            setFieldValue("doctorId", selectedDoctorIdValue);
+                            setFieldValue(
+                              "doctorName",
+                              selectedDoctor?.name || ""
+                            );
+                            setSelectedDoctorId(selectedDoctorIdValue);
+                            setFieldValue("time", "");
+                            setSelectTime({ time: "", date: "" });
+                            const sectionIdForSlots =
+                              typeof values.sectionId === "string"
+                                ? values.sectionId
+                                : selectedSection || undefined;
+                            lastFetchedLocationRef.current = "";
+                            fetchTimeSlots(
+                              sectionIdForSlots,
+                              values.location,
+                              values.testType,
+                              selectedDoctorIdValue || undefined
+                            );
+                          }}
+                          className="block w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        >
+                          <option value="">Selectează un medic</option>
+                          {doctors.map((doctor: any) => (
+                            <option key={doctor._id} value={doctor._id}>
+                              {doctor.name}{" "}
+                              {doctor.specialization &&
+                                `(${doctor.specialization})`}
+                            </option>
+                          ))}
+                        </Field>
+                        {errors.doctorId && touched.doctorId && (
+                          <div className="text-red-500 text-sm mt-1">
+                            {errors.doctorId}
                           </div>
                         )}
-                      </>
+                      </div>
                     )}
                   </div>
 
@@ -1072,7 +1062,7 @@ export default function AppointmentAddEdit({
                       aria-labelledby="location-group"
                       className="flex gap-3"
                     >
-                      {locations.map((loc: any) => (
+                      {(isEco ? locations : locations.filter((l) => l.name !== "Oradea")).map((loc: any) => (
                         <label 
                           key={loc._id} 
                           className={`flex items-center gap-2 px-4 py-2 rounded-md border-2 cursor-pointer transition-all ${
