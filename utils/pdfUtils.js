@@ -66,11 +66,13 @@ export const generatePDF = ({
     appointment.notes || "",
   ]);
 
-  // Add the table
+  // Add the table (must use Roboto — default Helvetica lacks Romanian diacritics)
   autoTable(doc, {
     head: [tableColumns],
     body: tableRows,
     startY: 40,
+    styles: { font: "Roboto", fontStyle: "normal" },
+    headStyles: { font: "Roboto", fontStyle: "bold" },
   });
 
   // Get the final Y position after the table
