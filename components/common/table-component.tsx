@@ -18,6 +18,7 @@ import api from "@/services/api";
 import type { Doctor } from "@/services/api";
 import isDateValid from "@/utils/isValidDate";
 import { buildTableRowsWithFreeSlots } from "@/utils/dashboardSlotRows";
+import InlineTimePicker from "@/components/common/inline-time-picker";
 
 interface Appointment {
   _id: string;
@@ -52,6 +53,7 @@ interface Appointment {
 type InlineRowMode =
   | {
       kind: "create";
+      timeMode: "slot" | "custom";
       slotTime: string;
       patientName: string;
       phoneNumber: string;
@@ -65,6 +67,7 @@ type InlineRowMode =
       patientName: string;
       phoneNumber: string;
       notes: string;
+      doctorId: string;
     };
 
 interface TableComponentProps {
@@ -119,6 +122,7 @@ const TableComponent: React.FC<TableComponentProps> = ({
     (slotTime: string, focusField: "patientName" | "phoneNumber" = "patientName") => {
       setInlineRow({
         kind: "create",
+        timeMode: "slot",
         slotTime,
         patientName: "",
         phoneNumber: "",
@@ -130,13 +134,35 @@ const TableComponent: React.FC<TableComponentProps> = ({
     [sectionDoctors]
   );
 
+  const startCustomCreate = useCallback(() => {
+    setInlineRow({
+      kind: "create",
+      timeMode: "custom",
+      slotTime: "09:00",
+      patientName: "",
+      phoneNumber: "",
+      notes: "",
+      doctorId: sectionDoctors[0]?._id || "",
+      focusField: "patientName",
+    });
+  }, [sectionDoctors]);
+
   const startEdit = useCallback((appointment: Appointment) => {
+    const rawDoctorId = appointment.doctorId as
+      | string
+      | { _id: string }
+      | undefined;
+    const doctorId =
+      typeof rawDoctorId === "string"
+        ? rawDoctorId
+        : rawDoctorId?._id || appointment.doctor?._id || "";
     setInlineRow({
       kind: "edit",
       appointmentId: appointment._id,
       patientName: appointment.patientName,
       phoneNumber: appointment.phoneNumber,
       notes: appointment.notes || "",
+      doctorId,
     });
   }, []);
 
@@ -155,7 +181,7 @@ const TableComponent: React.FC<TableComponentProps> = ({
   ]);
 
   const updateInlineField = (
-    field: "patientName" | "phoneNumber" | "notes" | "doctorId",
+    field: "patientName" | "phoneNumber" | "notes" | "doctorId" | "slotTime",
     value: string
   ) => {
     setInlineRow((prev) => (prev ? { ...prev, [field]: value } : null));
@@ -174,7 +200,6 @@ const TableComponent: React.FC<TableComponentProps> = ({
     }
 
     if (
-      inlineRow.kind === "create" &&
       !isEcoSection &&
       sectionDoctors.length > 0 &&
       !inlineRow.doctorId
@@ -184,7 +209,7 @@ const TableComponent: React.FC<TableComponentProps> = ({
     }
 
     const selectedDoctor = sectionDoctors.find(
-      (d) => d._id === (inlineRow.kind === "create" ? inlineRow.doctorId : "")
+      (d) => d._id === inlineRow.doctorId
     );
 
     setIsSaving(true);
@@ -195,11 +220,18 @@ const TableComponent: React.FC<TableComponentProps> = ({
           return;
         }
         const formattedDate = selectedDate.format("YYYY-MM-DD");
+        const isCustomTime =
+          inlineRow.kind === "create" && inlineRow.timeMode === "custom";
+        const time = inlineRow.slotTime.trim();
+        if (!time || !/^\d{1,2}:\d{2}$/.test(time)) {
+          toast.error("Selectați o oră validă.");
+          return;
+        }
         await api.post("/appointments", {
           location,
           date: formattedDate,
           day,
-          time: inlineRow.slotTime,
+          time,
           patientName,
           phoneNumber,
           notes,
@@ -213,7 +245,7 @@ const TableComponent: React.FC<TableComponentProps> = ({
             ? "-"
             : selectedDoctor?.name || "",
           isConfirmed: true,
-          isDefault: true,
+          isDefault: !isCustomTime,
         });
         toast.success("Programarea a fost creată cu succes!");
       } else {
@@ -221,6 +253,12 @@ const TableComponent: React.FC<TableComponentProps> = ({
           patientName,
           phoneNumber,
           notes,
+          ...(!isEcoSection && inlineRow.doctorId
+            ? {
+                doctorId: inlineRow.doctorId,
+                doctorName: selectedDoctor?.name || "",
+              }
+            : {}),
         });
         toast.success("Programarea a fost actualizată cu succes!");
       }
@@ -514,6 +552,42 @@ const TableComponent: React.FC<TableComponentProps> = ({
     );
   };
 
+  const renderCustomCreateRow = (isEcografie: boolean) => {
+    if (inlineRow?.kind !== "create" || inlineRow.timeMode !== "custom") {
+      return null;
+    }
+
+    const formattedDate = selectedDate?.format("D MMMM YYYY") ?? "";
+
+    return (
+      <tr
+        key="custom-create"
+        className="bg-amber-50 ring-2 ring-inset ring-amber-400 transition-colors"
+        onKeyDown={(e) => handleRowKeyDown(e, true)}
+        title={
+          formattedDate
+            ? `Orar temporar — aplicabil doar pentru ${formattedDate}`
+            : "Orar personalizat"
+        }
+      >
+        <td className="px-6 py-3 text-sm text-amber-800/80">—</td>
+        <td className="px-6 py-3 text-sm">{renderInlineSaveButton()}</td>
+        <td className="px-6 py-3 whitespace-nowrap text-sm">
+          <div className="space-y-1">
+            <InlineTimePicker
+              value={inlineRow.slotTime}
+              onChange={(time) => updateInlineField("slotTime", time)}
+            />
+            <p className="text-[10px] leading-tight text-amber-800">
+              Orar temporar
+            </p>
+          </div>
+        </td>
+        {renderInlineInputs(inlineRow, isEcografie)}
+      </tr>
+    );
+  };
+
   const renderTable = (appointmentsToRender: Appointment[], title?: string) => {
     const isEcografie = selectedTestType === "Ecografie";
     const useFreeSlotGrid = !sortField || sortField === "time";
@@ -605,6 +679,24 @@ const TableComponent: React.FC<TableComponentProps> = ({
           </div>
         )}
         <div className="bg-white shadow rounded-lg overflow-hidden">
+          {canInlineCreate && (
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-gray-50 px-4 py-2">
+              <p className="text-xs text-gray-600">
+                Adăugați o programare la o oră care nu este în programul zilei.
+              </p>
+              <button
+                type="button"
+                onClick={startCustomCreate}
+                disabled={
+                  inlineRow?.kind === "create" &&
+                  inlineRow.timeMode === "custom"
+                }
+                className="text-sm font-medium text-blue-700 hover:text-blue-900 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                + Orar personalizat
+              </button>
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
@@ -634,10 +726,12 @@ const TableComponent: React.FC<TableComponentProps> = ({
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
+                {renderCustomCreateRow(isEcografie)}
                 {displayRows.map((row, index) => {
                   if (row.type === "free") {
                     const isCreating =
                       inlineRow?.kind === "create" &&
+                      inlineRow.timeMode === "slot" &&
                       inlineRow.slotTime === row.slotTime;
 
                     return (
@@ -852,10 +946,16 @@ const TableComponent: React.FC<TableComponentProps> = ({
                                   aria-label="Telefon"
                                 />
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {appointment.doctor?.name ||
-                                  appointment.doctorName ||
-                                  "-"}
+                              <td className="px-6 py-4 text-sm">
+                                {sectionDoctors.length > 0 ? (
+                                  renderDoctorSelect(inlineRow.doctorId)
+                                ) : (
+                                  <span className="text-gray-900">
+                                    {appointment.doctor?.name ||
+                                      appointment.doctorName ||
+                                      "-"}
+                                  </span>
+                                )}
                               </td>
                               <td className="px-6 py-4 text-sm">
                                 <Input
