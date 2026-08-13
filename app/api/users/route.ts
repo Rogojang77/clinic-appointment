@@ -86,16 +86,10 @@ export async function POST(request: NextRequest) {
       doctorId: bodyDoctorId,
     } = body;
     
-    // Validate required fields (accessSection not required when role is doctor and doctorId provided)
+    // Validate required fields (accessSection required only for doctors)
     if (!username || !email || !password) {
       return NextResponse.json(
         { success: false, error: 'Username, email and password are required' },
-        { status: 400 }
-      );
-    }
-    if (role !== 'doctor' && !accessSection) {
-      return NextResponse.json(
-        { success: false, error: 'Access section is required for non-doctor users' },
         { status: 400 }
       );
     }
@@ -112,7 +106,7 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    let resolvedAccessSection = accessSection;
+    let resolvedAccessSection = accessSection || undefined;
     let resolvedDoctorId = bodyDoctorId;
 
     if (role === 'doctor' && bodyDoctorId) {
@@ -129,8 +123,21 @@ export async function POST(request: NextRequest) {
           { status: 409 }
         );
       }
+      if (!doctor.sectionId) {
+        return NextResponse.json(
+          { success: false, error: 'Access section is required for doctor users' },
+          { status: 400 }
+        );
+      }
       resolvedAccessSection = String(doctor.sectionId);
       resolvedDoctorId = doctor._id;
+    }
+
+    if (role === 'doctor' && !resolvedAccessSection) {
+      return NextResponse.json(
+        { success: false, error: 'Access section is required for doctor users' },
+        { status: 400 }
+      );
     }
 
     // Verify section exists (skip validation for "all" access)
@@ -154,11 +161,13 @@ export async function POST(request: NextRequest) {
       username,
       email,
       password: hashedPassword,
-      accessSection: resolvedAccessSection,
       role,
       isAdmin,
       isverified: true,
     };
+    if (resolvedAccessSection) {
+      userData.accessSection = resolvedAccessSection;
+    }
     if (resolvedDoctorId) {
       userData.doctorId = resolvedDoctorId;
     }

@@ -91,8 +91,12 @@ export default function UsersPage() {
         await usersApi.update(editingUser._id, updateData);
         toast.success('Utilizatorul a fost actualizat cu succes');
       } else {
-        // For new users, include password
-        await usersApi.create(formData);
+        const { accessSection, ...createData } = formData;
+        await usersApi.create(
+          accessSection
+            ? { ...createData, accessSection }
+            : createData
+        );
         toast.success('Utilizatorul a fost creat cu succes');
       }
 

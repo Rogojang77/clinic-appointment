@@ -80,6 +80,13 @@ export async function POST(
       );
     }
 
+    if (!doctor.sectionId) {
+      return NextResponse.json(
+        { success: false, error: "Access section is required for doctor users" },
+        { status: 400 }
+      );
+    }
+
     const accessSection = String(doctor.sectionId);
     const hashedPassword = await bcrypt.hash(password, 10);
 

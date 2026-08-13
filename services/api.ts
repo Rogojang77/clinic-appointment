@@ -182,7 +182,7 @@ export interface User {
   role: 'admin' | 'operator';
   isAdmin: boolean;
   isverified: boolean;
-  accessSection: string;
+  accessSection?: string;
   section?: Section;
   createdAt: string;
   updatedAt: string;

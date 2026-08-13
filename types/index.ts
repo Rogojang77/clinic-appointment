@@ -58,7 +58,7 @@ export interface User {
   username: string;
   email : string; 
   password: string;
-  accessSection: string;
+  accessSection?: string;
   role: "admin" | "operator" | "doctor";
   doctorId?: string;
   createdAt?: Date;

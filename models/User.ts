@@ -15,7 +15,7 @@ const UserSchema: Schema = new Schema(
         default:false,
 
     },
-    accessSection: { type: String, required: true },
+    accessSection: { type: String, required: false },
     role: { type: String, enum: ["admin", "operator", "doctor"], default: "operator" },
     doctorId: { type: Schema.Types.ObjectId, ref: "Doctor", required: false },
     createdAt: { type: Date, default: Date.now },
