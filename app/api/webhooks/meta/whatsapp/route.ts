@@ -114,16 +114,23 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      const update: Record<string, unknown> = {
-        whatsAppReminderStatus: reminderStatus,
+      // Delivery failure must not reopen cron eligibility after a successful Meta accept.
+      // Never downgrade appointment reminderStatus from "sent" → "failed".
+      const appointmentFilter: Record<string, unknown> = {
+        whatsAppReminderMessageSid: statusEvent.messageId,
       };
+      const appointmentUpdate: Record<string, unknown> = {};
       if (reminderStatus === "sent") {
-        update.whatsAppReminderSentAt = new Date();
+        appointmentUpdate.whatsAppReminderStatus = "sent";
+        appointmentUpdate.whatsAppReminderSentAt = new Date();
+      } else {
+        appointmentFilter.whatsAppReminderStatus = { $ne: "sent" };
+        appointmentUpdate.whatsAppReminderStatus = "failed";
       }
 
       const updated = await AppointModel.findOneAndUpdate(
-        { whatsAppReminderMessageSid: statusEvent.messageId },
-        { $set: update },
+        appointmentFilter,
+        { $set: appointmentUpdate },
         { new: true }
       ).lean<{ _id: unknown } | null>();
 

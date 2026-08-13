@@ -452,8 +452,6 @@ export async function PATCH(request: NextRequest) {
       update.day = weekdayRoFromYmd(ymd);
     }
 
-    const becameUnconfirmed =
-      update.isConfirmed === false && appointment.isConfirmed === true;
     const confirmationChanged =
       update.isConfirmed !== undefined &&
       !!update.isConfirmed !== !!appointment.isConfirmed;
@@ -483,7 +481,10 @@ export async function PATCH(request: NextRequest) {
     const dateOrTimeChanged =
       update.date !== undefined || update.time !== undefined;
 
-    if (dateOrTimeChanged || becameUnconfirmed) {
+    // Only reschedule (date/time change) re-opens WhatsApp reminder eligibility.
+    // Unconfirming in the UI must not clear whatsAppReminderStatus — that caused
+    // confirmed patients to receive duplicate cron reminders.
+    if (dateOrTimeChanged) {
       const bounds = computeWhatsAppReminderWindowBounds({
         date: effectiveDate,
         time: effectiveTime,

@@ -41,7 +41,23 @@ export async function GET(request: NextRequest) {
 
     const candidates = await AppointModel.find({
       date: { $gte: dateStart, $lte: dateEnd },
-      whatsAppReminderStatus: { $ne: "sent" },
+      isConfirmed: { $ne: true },
+      $and: [
+        {
+          $or: [
+            { whatsAppReminderStatus: "not_sent" },
+            { whatsAppReminderStatus: null },
+            { whatsAppReminderStatus: { $exists: false } },
+          ],
+        },
+        {
+          $or: [
+            { patientDecision: "pending" },
+            { patientDecision: null },
+            { patientDecision: { $exists: false } },
+          ],
+        },
+      ],
     })
       .populate("sectionId", "name")
       .populate("doctorId", "name")

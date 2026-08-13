@@ -11,6 +11,10 @@ import {
   sendWhatsAppReminder,
 } from "@/utils/whatsappMeta";
 
+function isReminderNotSent(status: unknown): boolean {
+  return status == null || status === "not_sent";
+}
+
 export async function POST(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
@@ -42,6 +46,17 @@ export async function POST(
       );
     }
 
+    if (!isReminderNotSent(appointment.whatsAppReminderStatus)) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Reminderul WhatsApp poate fi trimis manual doar când statusul este Netrimis.",
+        },
+        { status: 409 }
+      );
+    }
+
     const now = dayjs();
     const apptDt = appointmentToZonedDateTime({
       date: appointment.date,
@@ -61,24 +76,59 @@ export async function POST(
       );
     }
 
-    appointment.patientDecision = "pending";
-    appointment.patientDecisionAt = null;
-    appointment.confirmationTokenHash = null;
-    appointment.confirmationTokenExpiresAt = null;
-    await appointment.save();
+    // Claim immediately so a concurrent cron cannot also send.
+    const claimed = await AppointModel.findOneAndUpdate(
+      {
+        _id: appointment._id,
+        $or: [
+          { whatsAppReminderStatus: "not_sent" },
+          { whatsAppReminderStatus: null },
+          { whatsAppReminderStatus: { $exists: false } },
+        ],
+      },
+      {
+        $set: {
+          whatsAppReminderStatus: "sent",
+          whatsAppReminderSentAt: new Date(),
+          patientDecision: "pending",
+          patientDecisionAt: null,
+          confirmationTokenHash: null,
+          confirmationTokenExpiresAt: null,
+        },
+      },
+      { new: true }
+    );
+    if (!claimed) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "Reminderul WhatsApp poate fi trimis manual doar când statusul este Netrimis.",
+        },
+        { status: 409 }
+      );
+    }
 
     const sectionLabel = appointment.section?.name || appointment.testType || "-";
     const doctorRaw = appointment.doctor?.name || appointment.doctorName || "-";
     const doctorForMessage = resolveWhatsAppDoctorForSection(sectionLabel, doctorRaw);
 
-    const message = await sendWhatsAppReminder({
-      toPhoneNumberRaw: appointment.phoneNumber,
-      customerName: appointment.patientName,
-      section: sectionLabel,
-      doctor: doctorRaw,
-      appointmentDateText: apptDt.format("DD.MM.YYYY"),
-      appointmentTimeText: apptDt.format("HH:mm"),
-    });
+    let message: { sid: string; to: string };
+    try {
+      message = await sendWhatsAppReminder({
+        toPhoneNumberRaw: appointment.phoneNumber,
+        customerName: appointment.patientName,
+        section: sectionLabel,
+        doctor: doctorRaw,
+        appointmentDateText: apptDt.format("DD.MM.YYYY"),
+        appointmentTimeText: apptDt.format("HH:mm"),
+      });
+    } catch (sendErr: any) {
+      await AppointModel.findByIdAndUpdate(appointment._id, {
+        $set: { whatsAppReminderStatus: "failed" },
+      });
+      throw sendErr;
+    }
 
     const outboundPreview =
       `Template reminder pentru ${appointment.patientName || "Pacient"}: ` +
@@ -86,10 +136,13 @@ export async function POST(
       `${doctorForMessage}, ` +
       `${apptDt.format("DD.MM.YYYY")} ${apptDt.format("HH:mm")}`;
 
-    appointment.whatsAppReminderStatus = "sent";
-    appointment.whatsAppReminderSentAt = new Date();
-    appointment.whatsAppReminderMessageSid = message.sid;
-    await appointment.save();
+    await AppointModel.findByIdAndUpdate(appointment._id, {
+      $set: {
+        whatsAppReminderStatus: "sent",
+        whatsAppReminderSentAt: new Date(),
+        whatsAppReminderMessageSid: message.sid,
+      },
+    });
 
     const e164 = normalizePhoneNumberToE164RO(appointment.phoneNumber) || appointment.phoneNumber;
     await WhatsAppMessageModel.findOneAndUpdate(
@@ -122,4 +175,3 @@ export async function POST(
     );
   }
 }
-

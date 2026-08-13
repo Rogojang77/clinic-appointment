@@ -27,6 +27,25 @@ function isAuthorized(request: NextRequest): boolean {
   return false;
 }
 
+/** Only never-sent appointments; never retry sent/failed automatically. */
+const reminderNotSentFilter = {
+  $or: [
+    { whatsAppReminderStatus: "not_sent" },
+    { whatsAppReminderStatus: null },
+    { whatsAppReminderStatus: { $exists: false } },
+  ],
+};
+
+/** Skip appointments already decided by the patient or marked confirmed in UI. */
+const notConfirmedFilter = {
+  isConfirmed: { $ne: true },
+  $or: [
+    { patientDecision: "pending" },
+    { patientDecision: null },
+    { patientDecision: { $exists: false } },
+  ],
+};
+
 export async function POST(request: NextRequest) {
   const startedAt = Date.now();
   try {
@@ -57,8 +76,11 @@ export async function POST(request: NextRequest) {
 
     const candidates = await AppointModel.find({
       date: { $gte: dateStart, $lte: dateEnd },
-      whatsAppReminderStatus: { $ne: "sent" },
-      $or: [inScheduledWindow, legacyNoStoredWindow],
+      $and: [
+        reminderNotSentFilter,
+        notConfirmedFilter,
+        { $or: [inScheduledWindow, legacyNoStoredWindow] },
+      ],
     })
       .sort({ date: 1, time: 1 })
       .lean();
@@ -94,17 +116,35 @@ export async function POST(request: NextRequest) {
       }
       due += 1;
 
-      try {
-        // Reset patient decision state before sending a new reminder.
-        await AppointModel.findByIdAndUpdate(a._id, {
+      // Atomically claim so overlapping cron runs cannot double-send.
+      const claimed = await AppointModel.findOneAndUpdate(
+        {
+          _id: a._id,
+          isConfirmed: { $ne: true },
+          $and: [
+            reminderNotSentFilter,
+            {
+              $or: [
+                { patientDecision: "pending" },
+                { patientDecision: null },
+                { patientDecision: { $exists: false } },
+              ],
+            },
+          ],
+        },
+        {
           $set: {
-            patientDecision: "pending",
-            patientDecisionAt: null,
-            confirmationTokenHash: null,
-            confirmationTokenExpiresAt: null,
+            whatsAppReminderStatus: "sent",
+            whatsAppReminderSentAt: new Date(),
           },
-        });
+        },
+        { new: true }
+      );
+      if (!claimed) {
+        continue;
+      }
 
+      try {
         const sectionLabel = a.section?.name || a.testType || "-";
         const doctorRaw = a.doctor?.name || a.doctorName || "-";
         const doctorForMessage = resolveWhatsAppDoctorForSection(sectionLabel, doctorRaw);
@@ -161,6 +201,7 @@ export async function POST(request: NextRequest) {
           error: errMsg,
           stack: e?.stack ?? null,
         });
+        // Mark failed so cron will not retry forever (invalid numbers, undeliverable, etc.).
         await AppointModel.findByIdAndUpdate(a._id, {
           $set: {
             whatsAppReminderStatus: "failed",
@@ -186,4 +227,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

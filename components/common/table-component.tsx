@@ -642,6 +642,13 @@ const TableComponent: React.FC<TableComponentProps> = ({
           </span>
         );
       }
+      if (appointment.whatsAppReminderStatus === "failed") {
+        return (
+          <span className="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800">
+            Eșuat
+          </span>
+        );
+      }
       return (
         <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">
           Netrimis
@@ -790,9 +797,12 @@ const TableComponent: React.FC<TableComponentProps> = ({
                     inlineRow?.kind === "edit" &&
                     inlineRow.appointmentId === appointment._id;
                   const canEditDate = isDateValid(appointment.date);
-                  const isWhatsAppSent =
-                    appointment.whatsAppReminderStatus === "sent" ||
-                    !!sentById[appointment._id];
+                  const reminderStatus =
+                    appointment.whatsAppReminderStatus || "not_sent";
+                  const canSendWhatsApp =
+                    canEditDate &&
+                    reminderStatus === "not_sent" &&
+                    !sentById[appointment._id];
 
                   return (
                     <tr
@@ -815,16 +825,19 @@ const TableComponent: React.FC<TableComponentProps> = ({
                           <button
                             onClick={() => handleSendWhatsApp(appointment)}
                             className={`${
-                              canEditDate && !isWhatsAppSent
+                              canSendWhatsApp
                                 ? "text-green-700 hover:text-green-900"
                                 : "text-gray-400 cursor-not-allowed"
                             }`}
                             disabled={
-                              !canEditDate ||
-                              isWhatsAppSent ||
+                              !canSendWhatsApp ||
                               !!sendingById[appointment._id]
                             }
-                            title="Trimite WhatsApp"
+                            title={
+                              canSendWhatsApp
+                                ? "Trimite WhatsApp"
+                                : "Disponibil doar când statusul este Netrimis"
+                            }
                           >
                             {sendingById[appointment._id] ? (
                               <Loader className="h-4 w-4 animate-spin" />
