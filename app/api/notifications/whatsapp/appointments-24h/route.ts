@@ -36,9 +36,8 @@ const reminderNotSentFilter = {
   ],
 };
 
-/** Skip appointments already decided by the patient or marked confirmed in UI. */
-const notConfirmedFilter = {
-  isConfirmed: { $ne: true },
+/** Skip only if the patient already replied on WhatsApp. Staff Confirmat is unrelated. */
+const patientDecisionPendingFilter = {
   $or: [
     { patientDecision: "pending" },
     { patientDecision: null },
@@ -78,7 +77,7 @@ export async function POST(request: NextRequest) {
       date: { $gte: dateStart, $lte: dateEnd },
       $and: [
         reminderNotSentFilter,
-        notConfirmedFilter,
+        patientDecisionPendingFilter,
         { $or: [inScheduledWindow, legacyNoStoredWindow] },
       ],
     })
@@ -120,17 +119,7 @@ export async function POST(request: NextRequest) {
       const claimed = await AppointModel.findOneAndUpdate(
         {
           _id: a._id,
-          isConfirmed: { $ne: true },
-          $and: [
-            reminderNotSentFilter,
-            {
-              $or: [
-                { patientDecision: "pending" },
-                { patientDecision: null },
-                { patientDecision: { $exists: false } },
-              ],
-            },
-          ],
+          $and: [reminderNotSentFilter, patientDecisionPendingFilter],
         },
         {
           $set: {
