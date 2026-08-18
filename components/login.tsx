@@ -3,7 +3,6 @@ import { Formik, Form, Field, ErrorMessage } from "formik";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import api from "@/services/api";
-import * as Yup from "yup";
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { useUserStore } from "@/store/store";
@@ -12,24 +11,7 @@ import { isTokenExpiredSync, decodeJwtPayloadUnsafe } from "@/utils/jwtUtils";
 import axios from "axios";
 import { Eye, EyeOff } from "lucide-react";
 import { copy } from "@/lib/copy";
-
-const ALLOWED_REDIRECT_PREFIXES = ["/dashboard", "/doctor", "/doctors", "/superadmin"];
-
-function isRedirectAllowed(path: string | null): boolean {
-  if (!path || typeof path !== "string") return false;
-  const decoded = decodeURIComponent(path);
-  if (!decoded.startsWith("/")) return false;
-  return ALLOWED_REDIRECT_PREFIXES.some((p) => decoded === p || decoded.startsWith(p + "/"));
-}
-
-const signInSchema = Yup.object().shape({
-  email: Yup.string()
-    .email(copy.invalidEmail)
-    .required(copy.emailRequired),
-  password: Yup.string()
-    .min(6, copy.passwordMinLength)
-    .required(copy.passwordRequired),
-});
+import { isRedirectAllowed, signInSchema } from "@/utils/loginValidation";
 
 const SignIn = () => {
   const router = useRouter();

@@ -266,13 +266,17 @@ export function appointmentToZonedDateTime(params: {
   if (!hm) return null;
 
   let d: Dayjs;
-  if (typeof params.date === "string") {
-    // Expected: "YYYY-MM-DD"
-    d = dayjs.tz(params.date, "YYYY-MM-DD", tz);
-  } else {
-    // Ziua calendaristică din UTC (API salvează de obicei startOf-day UTC pentru YYYY-MM-DD)
-    const ymd = dayjs.utc(params.date).format("YYYY-MM-DD");
-    d = dayjs.tz(ymd, "YYYY-MM-DD", tz);
+  try {
+    if (typeof params.date === "string") {
+      // Expected: "YYYY-MM-DD"
+      d = dayjs.tz(params.date, "YYYY-MM-DD", tz);
+    } else {
+      // Ziua calendaristică din UTC (API salvează de obicei startOf-day UTC pentru YYYY-MM-DD)
+      const ymd = dayjs.utc(params.date).format("YYYY-MM-DD");
+      d = dayjs.tz(ymd, "YYYY-MM-DD", tz);
+    }
+  } catch {
+    return null;
   }
 
   if (!d.isValid()) return null;

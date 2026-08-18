@@ -111,3 +111,6 @@ pids
 # Turborepo
 .turbo
 docker-compose.dev.yml
+/tests
+vitest.config.ts
+vitest.config.ts

@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "seed": "node seed/index.js"
+    "seed": "node seed/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.2",
@@ -56,6 +58,7 @@
     "eslint-config-next": "^15.5.9",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "vitest": "^3.2.4"
   }
 }
