@@ -386,9 +386,11 @@ const TableComponent: React.FC<TableComponentProps> = ({
           : "Confirmarea programării a fost anulată!"
       );
       fetchData();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      toast.error("Ceva nu a mers bine!");
+      toast.error(
+        err?.response?.data?.message || "Ceva nu a mers bine!"
+      );
     }
   };
 

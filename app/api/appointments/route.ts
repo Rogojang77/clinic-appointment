@@ -23,9 +23,22 @@ function escapeRegExp(value: string): string {
 }
 
 function normalizeScopeValue(value: unknown): string | undefined {
-  if (typeof value !== "string") return undefined;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
+  if (value == null) return undefined;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }
+  if (typeof value === "object") {
+    const rec = value as { _id?: unknown; toString?: () => string };
+    if (rec._id != null && rec._id !== value) {
+      return normalizeScopeValue(rec._id);
+    }
+    if (typeof rec.toString === "function") {
+      const asString = rec.toString();
+      if (asString && asString !== "[object Object]") return asString;
+    }
+  }
+  return undefined;
 }
 
 async function hasSlotConflict(params: {
@@ -432,6 +445,10 @@ export async function PATCH(request: NextRequest) {
     for (const key of allowed) {
       if (body[key] !== undefined) update[key] = body[key];
     }
+    // Empty doctorId in a partial PATCH must not wipe the existing medic.
+    if (update.doctorId !== undefined && !normalizeScopeValue(update.doctorId)) {
+      delete update.doctorId;
+    }
 
     if (update.date !== undefined) {
       const di = update.date;
@@ -459,7 +476,8 @@ export async function PATCH(request: NextRequest) {
     const effectiveTestType =
       update.testType !== undefined ? update.testType : appointment.testType;
     const effectiveDoctorId =
-      update.doctorId !== undefined ? update.doctorId : appointment.doctorId;
+      normalizeScopeValue(update.doctorId) ??
+      normalizeScopeValue(appointment.doctorId);
     conflictDoctorId = effectiveDoctorId;
 
     const isEcografie =
